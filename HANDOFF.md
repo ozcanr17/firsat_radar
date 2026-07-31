@@ -44,6 +44,7 @@ The tracked `site/` snapshot contains derived product facts and recommendations 
 - Pytest passed: 40 tests.
 - Pip dependency check passed.
 - Static export completed with three Anne & Bebek products and three recommendations.
+- Published Pages panel and live search behavior were visually verified.
 
 ## Safety contract
 
