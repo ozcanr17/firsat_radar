@@ -1,6 +1,6 @@
 # ADR 0001: Hepsiburada data access
 
-- Status: Accepted
+- Status: Superseded by ADR 0002
 - Decision: STOP
 - Checked at: 2026-07-31T13:24:34Z
 - Source: Hepsiburada

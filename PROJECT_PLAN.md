@@ -2,13 +2,13 @@
 
 ## Stage 0: Data-access discovery
 
-Status: Complete with `STOP`.
+Status: Complete with `GO` for browser-rendered public pages.
 
 Validate the live robots policy, listing access, available fields, canonical product access, and review coverage at the smallest safe request volume. Record the decision in an ADR.
 
 ## Stage 1: Skeleton and database
 
-Status: Blocked by Stage 0.
+Status: Ready.
 
 Create the Python project, configuration, migrations, CLI, health endpoint, and basic web shell.
 
