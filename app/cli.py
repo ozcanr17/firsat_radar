@@ -10,6 +10,7 @@ import typer
 import uvicorn
 from sqlalchemy import Engine, inspect, text
 
+from app.bootstrap import build_pipeline
 from app.config import Settings
 from app.db.migrations import upgrade_database
 from app.db.session import build_engine, build_session_factory
@@ -42,28 +43,7 @@ def build_crawl_service(settings: Settings) -> tuple[CrawlService, Engine]:
 def build_scheduled_pipeline(settings: Settings) -> tuple[ScheduledPipeline, Engine]:
     engine = build_engine(settings)
     session_factory = build_session_factory(engine)
-    crawler = CrawlService(
-        settings,
-        session_factory,
-        lambda: HepsiburadaBrowserAdapter(settings),
-    )
-    catalog = CatalogMonitor(
-        session_factory,
-        crawler,
-        settings.catalog_products_per_page,
-        settings.catalog_details_per_page,
-    )
-    pipeline = ScheduledPipeline(
-        settings=settings,
-        crawler=crawler,
-        analyzer=AnalysisService(session_factory),
-        backup=DatabaseBackupService(settings),
-        retention=RawStore(settings.data_dir / "raw"),
-        runtime_state=RuntimeStateService(session_factory),
-        catalog=catalog,
-        watchlist=WatchlistMonitor(session_factory, crawler),
-    )
-    return pipeline, engine
+    return build_pipeline(settings, session_factory), engine
 
 
 def validate_source(source: str) -> None:

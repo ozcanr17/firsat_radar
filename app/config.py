@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     environment: Literal["development", "test", "production"] = "development"
     host: str = "127.0.0.1"
     port: int = 8000
+    admin_username: str = "admin"
+    admin_password: SecretStr | None = None
     data_dir: Path = Path("data")
     database_url: str | None = None
     timezone: str = "Europe/Istanbul"
@@ -29,6 +31,7 @@ class Settings(BaseSettings):
     scheduler_details: int = Field(default=5, ge=0, le=20)
     watchlist_enabled: bool = True
     watchlist_targets_per_run: int = Field(default=3, ge=1, le=10)
+    embedded_scheduler_enabled: bool = False
     catalog_enabled: bool = False
     catalog_pages_per_run: int = Field(default=3, ge=1, le=10)
     catalog_products_per_page: int = Field(default=60, ge=1, le=60)

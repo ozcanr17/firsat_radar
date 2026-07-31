@@ -254,6 +254,7 @@ class WatchTarget(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"))
+    source_name: Mapped[str] = mapped_column(String(100), default="hepsiburada", nullable=False)
     target_type: Mapped[str] = mapped_column(String(30), nullable=False)
     label: Mapped[str] = mapped_column(String(500), nullable=False)
     source_url: Mapped[str | None] = mapped_column(String(2048), unique=True)

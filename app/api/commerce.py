@@ -16,9 +16,11 @@ from app.services.commerce import (
     remove_watch_target,
     save_business_case,
 )
+from app.services.marketplaces import list_marketplaces
 
 
 class WatchTargetRequest(BaseModel):
+    source_name: str = Field(default="hepsiburada", max_length=100)
     target_type: str
     label: str = Field(min_length=1, max_length=500)
     source_url: str | None = Field(default=None, max_length=2048)
@@ -30,6 +32,7 @@ class WatchTargetRequest(BaseModel):
 class WatchTargetResponse(BaseModel):
     id: int
     product_id: int | None
+    source_name: str
     target_type: str
     label: str
     source_url: str | None
@@ -42,11 +45,27 @@ class WatchTargetResponse(BaseModel):
     freshness_hours: float | None
     refresh_due: bool
     queue_score: float
+    access_state: str
 
 
 class WatchlistResponse(BaseModel):
     items: list[WatchTargetResponse]
     count: int
+
+
+class MarketplaceResponse(BaseModel):
+    key: str
+    label: str
+    base_url: str
+    access_mode: str
+    access_state: str
+    state_label: str
+    description: str
+    requirement: str
+    documentation_url: str | None
+    capabilities: list[str]
+    product_count: int
+    watch_count: int
 
 
 class BusinessCaseRequest(BaseModel):
@@ -91,6 +110,17 @@ def create_commerce_router(session_factory: SessionFactory) -> APIRouter:
     def watchlist() -> WatchlistResponse:
         items = [watch_target_response(item) for item in list_watch_targets(session_factory)]
         return WatchlistResponse(items=items, count=len(items))
+
+    @router.get("/marketplaces", response_model=list[MarketplaceResponse])
+    def marketplaces() -> list[MarketplaceResponse]:
+        return [
+            MarketplaceResponse(
+                **(item.definition.__dict__ | {"capabilities": list(item.definition.capabilities)}),
+                product_count=item.product_count,
+                watch_count=item.watch_count,
+            )
+            for item in list_marketplaces(session_factory)
+        ]
 
     @router.post("/watchlist", response_model=WatchTargetResponse, status_code=201)
     def create_watch_target(payload: WatchTargetRequest) -> WatchTargetResponse:

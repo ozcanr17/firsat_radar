@@ -2,78 +2,76 @@
 
 ## Current stage
 
-Stage 11: Operator trade desk and watchlist refresh
+Stage 12: Cloud control plane and multi-market foundation
 
 Status: Complete
 
-Release: 1.4.0
+Release: 1.5.0
 
 ## Delivered
 
-- Added the local Esnaf Masası at `/trade-desk`.
-- Added persistent product/category watch targets with priority and refresh intervals.
-- Added a freshness queue combining operator priority, data age, opportunity score, and unresolved discovery state.
-- Added direct, policy-gated refresh for due products already known to the catalog.
-- Made the hourly scheduler prioritize up to three due watchlist products.
-- Removed separate review-page navigation; only reviews already visible on the opened product page are classified.
-- Added review pain clusters with frequency and high-severity counts.
-- Added persisted unit economics: purchase, commission, shipping, packaging, advertising, returns, tax, other cost, target margin, and volume.
-- Added contribution, net margin, return on cost, break-even price, target sale price, monthly contribution, and strict GO/NO-GO decisions.
-- Connected unit economics to recommendation evidence and risks.
-- Added a non-persisting profitability calculator to the public GitHub Pages panel.
-- Added watchlist and commerce JSON APIs.
-- Added schema migration `20260731_0008`.
-- Recorded the safe optional AI decision boundary in ADR 0004.
+- Added a production Docker image with Playwright Chromium.
+- Added Railway configuration for GitHub deployments, health checks, one replica, and a persistent `/data` volume.
+- Added automatic migrations and an optional embedded hourly scheduler to the FastAPI lifecycle.
+- Added password protection for every panel and API route except `/healthz` and static assets.
+- Added `/marketplaces` as the marketplace connection control center.
+- Registered Hepsiburada, Amazon Türkiye, Trendyol, and MediaMarkt Türkiye with explicit collection modes and access states.
+- Added `/api/v1/marketplaces` for connector visibility.
+- Extended watch targets with a marketplace source and safe per-domain URL normalization.
+- Allowed the Esnaf Masası to record products or categories from all registered marketplaces.
+- Added schema migration `20260731_0009`.
+- Removed the Anne & Bebek-only restriction from product selection in the Esnaf Masası.
+- Added the Railway environment template and cloud deployment guide.
 
-## Operating model
+## Cloud operating model
 
-1. Add a known product or category hypothesis in Esnaf Masası.
-2. Keep `.venv/bin/python -m app.cli schedule` running separately from the web panel.
-3. The scheduler refreshes due products sequentially under policy, quota, rate, and circuit-breaker controls.
-4. Run or wait for deterministic analysis.
-5. Enter real costs before acting on a recommendation.
-6. Treat only aligned market evidence and positive unit economics as an actionable test candidate.
+1. Railway builds the repository Dockerfile whenever `main` changes.
+2. The FastAPI panel migrates the database and starts behind a required administrator password.
+3. A single embedded scheduler prioritizes due watch targets every hour.
+4. Runtime data, evidence, watch targets, and business cases persist on `/data`.
+5. GitHub Pages remains the public read-only snapshot; the Railway URL is the private operational panel.
+6. The service must remain at one replica while SQLite and the embedded scheduler share a volume.
 
-Unresolved product URLs wait for sitemap discovery. They are never converted into blind category browsing or query pagination.
+The cloud service is fully prepared but cannot receive a public URL until the owner creates the Railway project, attaches `/data`, and sets the administrator password. These are account and secret operations that cannot be committed to a public repository.
 
-## Source-access decision
+## Marketplace access
 
-- A bounded sitemap acceptance attempt on 2026-07-31 returned a Hepsiburada security page instead of XML.
-- No bypass was attempted and hosted recurring collection remains disabled.
-- The GitHub bot checks policy, analyzes cached permitted data, and publishes without product-page collection.
-- Sitemap-first category discovery remains blocked until a policy-gated endpoint returns valid XML.
+- Hepsiburada: existing visible-browser collector, policy gate, bounded rate, and stop conditions.
+- Amazon Türkiye: connector contract is identified as Creators API; credentials and account eligibility are required.
+- Trendyol: official Marketplace Partner API manages seller operations and is not treated as an unrestricted full-market catalog API; an approved catalog or affiliate feed is required.
+- MediaMarkt Türkiye: an approved catalog or affiliate feed is required before automated collection is marked active.
+
+Targets can already be registered for every marketplace. Unsupported sources remain visibly blocked and are not silently crawled.
 
 ## Delivery
 
-- Public panel: `https://ozcanr17.github.io/firsat_radar/`
+- Public snapshot: `https://ozcanr17.github.io/firsat_radar/`
 - Repository: `https://github.com/ozcanr17/firsat_radar`
-- Local panel: `.venv/bin/python -m app.cli open-panel`
-- Local scheduler: `.venv/bin/python -m app.cli schedule`
-- One-time watch refresh: `.venv/bin/python -m app.cli watchlist-refresh --limit 3`
-- Static export: `.venv/bin/python -m app.cli export-site --output public`
+- Cloud instructions: `docs/CLOUD_DEPLOYMENT.md`
+- Cloud configuration: `railway.toml`, `Dockerfile`, `.env.railway.example`
 
-Runtime SQLite, watch targets, business cases, policy files, cached pages, and raw review evidence remain ignored under `data/`.
+Runtime SQLite, marketplace credentials, watch targets, business cases, policy files, cached pages, and raw review evidence remain outside Git under `data/` or cloud secrets.
 
 ## Verification
 
 - Ruff lint passed.
 - Ruff format check passed.
 - Mypy strict mode passed.
-- Pytest passed: 45 tests.
-- Pip dependency check passed.
-- Esnaf Masası desktop layout was visually verified against the migrated local database.
-- Public profitability calculator produced the expected live GO result.
-- No live external product request was made during this stage.
+- Pytest passed: 48 tests.
+- Production Docker image built successfully.
+- Container `/healthz` returned HTTP 200.
+- Container `/marketplaces` returned HTTP 401 without credentials and HTTP 200 with valid credentials.
+- No external product page was requested during this stage.
 
 ## Safety contract
 
 - One browser connection with 6–12 seconds between external requests.
 - Hard limit of 800 requests per UTC day.
-- No query pagination, `/product-comment/`, separate review-page navigation, hidden API, proxy rotation, CAPTCHA bypass, or access-control bypass.
+- No hidden API, query-pagination abuse, proxy rotation, CAPTCHA bypass, or access-control bypass.
 - Stop on policy denial, HTTP 403, HTTP 429, CAPTCHA, security page, or parser drift.
-- No reviewer identity or direct contact information is published.
+- Credentials stay in cloud secrets and never enter Git.
 - Market scores and profitability calculations remain validation aids, not guarantees.
 
 ## Next stage
 
-Stage 12 must validate sitemap XML, implement sitemap-first discovery for baby strollers, high chairs, and bottle/pacifier products, and generate category commercial briefs. An optional model-assisted brief layer can then be added after API credentials are configured; deterministic evidence and unit economics remain the authority.
+Stage 13 connects official or approved marketplace data sources. Amazon requires Creators API credentials. Trendyol and MediaMarkt require approved catalog or affiliate feeds. After the first second-market source is active, add cross-market product matching, price dispersion, category briefs, and opportunity ranking across sources.

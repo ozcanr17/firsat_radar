@@ -13,6 +13,7 @@ from app.db.session import SessionFactory
 from app.services.catalog import CatalogMonitor
 from app.services.commerce import list_business_cases, list_watch_targets
 from app.services.dashboard import get_dashboard_stats
+from app.services.marketplaces import MARKETPLACES, list_marketplaces
 from app.services.opportunities import OpportunityView, list_latest_opportunities
 from app.services.product_detail import get_product_page
 from app.services.products import ProductView, list_latest_products, search_products
@@ -176,11 +177,7 @@ def create_web_router(settings: Settings, session_factory: SessionFactory) -> AP
     def trade_desk_page(request: Request) -> HTMLResponse:
         targets = list_watch_targets(session_factory)
         business_cases = list_business_cases(session_factory)
-        products = [
-            product
-            for product in list_latest_products(session_factory, 500)
-            if product.category and "anne" in product.category.casefold()
-        ]
+        products = list_latest_products(session_factory, 500)
         context = shared_context(request, "trade_desk")
         context.update(
             {
@@ -188,11 +185,22 @@ def create_web_router(settings: Settings, session_factory: SessionFactory) -> AP
                 "refresh_due_count": sum(item.refresh_due for item in targets),
                 "business_cases": business_cases,
                 "products": products,
+                "marketplaces": MARKETPLACES,
             }
         )
         return templates.TemplateResponse(
             request=request,
             name="trade_desk.html",
+            context=context,
+        )
+
+    @router.get("/marketplaces", response_class=HTMLResponse, name="marketplaces_page")
+    def marketplaces_page(request: Request) -> HTMLResponse:
+        context = shared_context(request, "marketplaces")
+        context.update({"marketplaces": list_marketplaces(session_factory)})
+        return templates.TemplateResponse(
+            request=request,
+            name="marketplaces.html",
             context=context,
         )
 
@@ -214,7 +222,7 @@ def create_web_router(settings: Settings, session_factory: SessionFactory) -> AP
         context.update(
             {
                 "settings_rows": (
-                    ("Kaynak", "Hepsiburada"),
+                    ("Kaynak kapsamı", "4 pazar yeri bağlantısı"),
                     ("Başlangıç adresi", settings.hepsiburada_start_url),
                     ("Tarayıcı", settings.browser_channel or "Playwright Chromium"),
                     (
@@ -251,6 +259,20 @@ def create_web_router(settings: Settings, session_factory: SessionFactory) -> AP
                     ("Ham kanıt saklama", f"{settings.raw_retention_days} gün"),
                     ("Yedek saklama", f"Son {settings.backup_retention_count} yedek"),
                     ("Veri dizini", str(settings.data_dir.resolve())),
+                    (
+                        "Çalışma biçimi",
+                        (
+                            "Bulut servisi"
+                            if settings.environment == "production"
+                            else "Yerel geliştirme"
+                        ),
+                    ),
+                    (
+                        "Arka plan botu",
+                        "Panelle birlikte çalışıyor"
+                        if settings.embedded_scheduler_enabled
+                        else "Ayrı zamanlayıcı",
+                    ),
                 ),
                 "runtime": RuntimeStateService(session_factory).get(),
                 "catalog": catalog.status(),

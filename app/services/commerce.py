@@ -7,6 +7,7 @@ from sqlalchemy import select
 
 from app.db.models import BusinessCase, Product, WatchTarget
 from app.db.session import SessionFactory
+from app.services.marketplaces import MARKETPLACE_BY_KEY
 from app.services.products import ProductView, list_latest_products
 
 MONEY = Decimal("0.01")
@@ -21,12 +22,14 @@ class WatchTargetInput:
     category: str | None
     priority: int
     refresh_interval_hours: int
+    source_name: str = "hepsiburada"
 
 
 @dataclass(frozen=True)
 class WatchTargetView:
     id: int
     product_id: int | None
+    source_name: str
     target_type: str
     label: str
     source_url: str | None
@@ -39,6 +42,7 @@ class WatchTargetView:
     freshness_hours: float | None
     refresh_due: bool
     queue_score: float
+    access_state: str
 
 
 @dataclass(frozen=True)
@@ -80,13 +84,29 @@ class BusinessCaseView:
 
 
 def normalize_hepsiburada_url(value: str) -> str:
+    try:
+        return normalize_marketplace_url("hepsiburada", value)
+    except ValueError as error:
+        if str(error) == "invalid_marketplace_url":
+            raise ValueError("invalid_hepsiburada_url") from error
+        raise
+
+
+def normalize_marketplace_url(source_name: str, value: str) -> str:
+    marketplace = MARKETPLACE_BY_KEY.get(source_name)
+    if marketplace is None:
+        raise ValueError("invalid_source")
     parsed = urlsplit(value.strip())
     hostname = (parsed.hostname or "").casefold()
-    if parsed.scheme != "https" or hostname not in {"hepsiburada.com", "www.hepsiburada.com"}:
-        raise ValueError("invalid_hepsiburada_url")
-    if not parsed.path.startswith("/") or parsed.path.startswith("/product-comment/"):
+    expected_hostname = (urlsplit(marketplace.base_url).hostname or "").casefold()
+    allowed_hostnames = {expected_hostname, expected_hostname.removeprefix("www.")}
+    if parsed.scheme != "https" or hostname not in allowed_hostnames:
+        raise ValueError("invalid_marketplace_url")
+    if not parsed.path.startswith("/"):
         raise ValueError("forbidden_target_url")
-    return urlunsplit(("https", "www.hepsiburada.com", parsed.path.rstrip("/"), "", ""))
+    if source_name == "hepsiburada" and parsed.path.startswith("/product-comment/"):
+        raise ValueError("forbidden_target_url")
+    return urlunsplit(("https", expected_hostname, parsed.path.rstrip("/") or "/", "", ""))
 
 
 def add_watch_target(
@@ -103,7 +123,12 @@ def add_watch_target(
         raise ValueError("invalid_priority")
     if not 1 <= target.refresh_interval_hours <= 168:
         raise ValueError("invalid_refresh_interval")
-    source_url = normalize_hepsiburada_url(target.source_url) if target.source_url else None
+    source_name = target.source_name.strip().casefold()
+    if source_name not in MARKETPLACE_BY_KEY:
+        raise ValueError("invalid_source")
+    source_url = (
+        normalize_marketplace_url(source_name, target.source_url) if target.source_url else None
+    )
     if target_type == "product" and source_url is None:
         raise ValueError("product_url_required")
     category = target.category.strip() if target.category else None
@@ -121,6 +146,7 @@ def add_watch_target(
         if watch_target is None:
             watch_target = WatchTarget(
                 product_id=product.id if product else None,
+                source_name=source_name,
                 target_type=target_type,
                 label=label,
                 source_url=source_url,
@@ -132,6 +158,7 @@ def add_watch_target(
             session.flush()
         else:
             watch_target.product_id = product.id if product else watch_target.product_id
+            watch_target.source_name = source_name
             watch_target.target_type = target_type
             watch_target.label = label
             watch_target.category = category
@@ -179,7 +206,11 @@ def watch_target_view(
 ) -> WatchTargetView:
     reference = target.last_checked_at or (product.observed_at if product else None)
     freshness_hours = hours_since(reference, now) if reference else None
-    refresh_due = freshness_hours is None or freshness_hours >= target.refresh_interval_hours
+    marketplace = MARKETPLACE_BY_KEY[target.source_name]
+    collection_enabled = marketplace.access_state == "active"
+    refresh_due = collection_enabled and (
+        freshness_hours is None or freshness_hours >= target.refresh_interval_hours
+    )
     opportunity = product.opportunity_score if product and product.opportunity_score else 0.0
     age_signal = min(freshness_hours or 168.0, 168.0) / 8.4
     unresolved_signal = 25.0 if target.product_id is None else 0.0
@@ -189,6 +220,7 @@ def watch_target_view(
     return WatchTargetView(
         id=target.id,
         product_id=target.product_id,
+        source_name=target.source_name,
         target_type=target.target_type,
         label=target.label,
         source_url=target.source_url,
@@ -201,6 +233,11 @@ def watch_target_view(
         freshness_hours=round(freshness_hours, 1) if freshness_hours is not None else None,
         refresh_due=refresh_due,
         queue_score=queue_score,
+        access_state=(
+            "discovery_pending"
+            if marketplace.access_state == "active" and target.product_id is None
+            else marketplace.access_state
+        ),
     )
 
 

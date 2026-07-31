@@ -34,6 +34,9 @@
                 <a class="nav-item {{ 'active' if active_page == 'trade_desk' else '' }}" href="{{ url_for('trade_desk_page') }}">
                     <span class="nav-icon">₺</span><span>Esnaf masası</span>
                 </a>
+                <a class="nav-item {{ 'active' if active_page == 'marketplaces' else '' }}" href="{{ url_for('marketplaces_page') }}">
+                    <span class="nav-icon">◎</span><span>Pazar yerleri</span>
+                </a>
                 <a class="nav-item {{ 'active' if active_page == 'runs' else '' }}" href="{{ url_for('runs_page') }}">
                     <span class="nav-icon">◷</span><span>Çalışmalar</span>
                 </a>
@@ -51,12 +54,12 @@
         <main class="main-panel">
             <header class="topbar">
                 <div>
-                    <p class="topbar-kicker">Yerel ve izlenebilir veri</p>
+                    <p class="topbar-kicker">İzinli ve izlenebilir pazar verisi</p>
                     <p class="topbar-time">Son görüntüleme · {{ generated_at|local_datetime }}</p>
                 </div>
                 <div class="topbar-actions">
                     {% block topbar_actions %}{% endblock %}
-                    <span class="live-indicator"><span></span>Yerel sistem</span>
+                    <span class="live-indicator"><span></span>{{ 'Bulut sistemi' if environment == 'production' else 'Geliştirme sistemi' }}</span>
                 </div>
             </header>
             <div class="page-container">

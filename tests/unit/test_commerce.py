@@ -6,6 +6,7 @@ from app.services.commerce import (
     BusinessCaseInput,
     calculate_unit_economics,
     normalize_hepsiburada_url,
+    normalize_marketplace_url,
 )
 
 
@@ -49,3 +50,17 @@ def test_target_url_is_canonicalized_and_restricted() -> None:
 
     with pytest.raises(ValueError, match="forbidden_target_url"):
         normalize_hepsiburada_url("https://www.hepsiburada.com/product-comment/urun")
+
+
+def test_multimarket_urls_are_canonicalized_to_registered_hosts() -> None:
+    assert (
+        normalize_marketplace_url("amazon_tr", "https://amazon.com.tr/example?tag=test")
+        == "https://www.amazon.com.tr/example"
+    )
+    assert (
+        normalize_marketplace_url("trendyol", "https://www.trendyol.com/example#reviews")
+        == "https://www.trendyol.com/example"
+    )
+
+    with pytest.raises(ValueError, match="invalid_marketplace_url"):
+        normalize_marketplace_url("mediamarkt_tr", "https://example.com/product")

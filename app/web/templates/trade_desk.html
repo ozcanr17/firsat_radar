@@ -18,10 +18,11 @@
     <article class="trade-panel">
         <div class="panel-heading"><div><span class="section-tag">İZLEME KUYRUĞU</span><h2>Radarına hedef ekle</h2></div><span class="panel-number">01</span></div>
         <form id="watch-form" class="trade-form">
+            <label><span>Pazar yeri</span><select name="source_name">{% for marketplace in marketplaces %}<option value="{{ marketplace.key }}">{{ marketplace.label }}</option>{% endfor %}</select></label>
             <label><span>Hedef türü</span><select name="target_type"><option value="product">Ürün</option><option value="category">Kategori</option></select></label>
             <label class="wide"><span>Kayıtlı ürün</span><select id="watch-product"><option value="">Elle adres gireceğim</option>{% for product in products %}<option value="{{ product.id }}" data-title="{{ product.title }}" data-url="{{ product.source_url }}" data-category="{{ product.category or '' }}">{{ product.title }}</option>{% endfor %}</select></label>
             <label class="wide"><span>Başlık</span><input name="label" maxlength="500" required placeholder="Örn. Hafif kabin tipi bebek arabaları"></label>
-            <label class="wide"><span>Hepsiburada adresi</span><input name="source_url" type="url" placeholder="https://www.hepsiburada.com/..."></label>
+            <label class="wide"><span>Ürün veya kategori adresi</span><input name="source_url" type="url" placeholder="https://..."></label>
             <label><span>Öncelik</span><select name="priority"><option value="5">Çok yüksek</option><option value="4">Yüksek</option><option value="3" selected>Normal</option><option value="2">Düşük</option><option value="1">Arşiv</option></select></label>
             <label><span>Yenileme</span><select name="refresh_interval_hours"><option value="6">6 saat</option><option value="12">12 saat</option><option value="24" selected>24 saat</option><option value="72">3 gün</option><option value="168">7 gün</option></select></label>
             <input name="category" type="hidden">
@@ -57,7 +58,7 @@
         {% for target in targets %}
         <article class="queue-item">
             <div class="queue-score"><strong>{{ "%.0f"|format(target.queue_score) }}</strong><span>kuyruk puanı</span></div>
-            <div class="queue-copy"><div><span class="status-dot {{ 'due' if target.refresh_due else '' }}"></span>{{ 'Yenileme bekliyor' if target.refresh_due else 'Güncel' }} · Öncelik {{ target.priority }}/5</div><h3>{{ target.label }}</h3><p>{{ target.category or ('Ürün hedefi' if target.target_type == 'product' else 'Kategori hedefi') }} · {{ ("%.0f saat önce"|format(target.freshness_hours)) if target.freshness_hours is not none else 'Henüz keşfedilmedi' }}</p></div>
+            <div class="queue-copy"><div><span class="status-dot {{ 'due' if target.refresh_due else '' }}"></span>{{ 'Yenileme bekliyor' if target.refresh_due else ('Keşif bekliyor' if target.access_state == 'discovery_pending' else 'Bağlantı bekliyor') }} · {{ target.source_name|replace('_tr', '')|title }} · Öncelik {{ target.priority }}/5</div><h3>{{ target.label }}</h3><p>{{ target.category or ('Ürün hedefi' if target.target_type == 'product' else 'Kategori hedefi') }} · {{ ("%.0f saat önce"|format(target.freshness_hours)) if target.freshness_hours is not none else 'Henüz veri yok' }}</p></div>
             <div class="queue-actions">{% if target.source_url %}<a href="{{ target.source_url }}" target="_blank" rel="noreferrer">Kaynak ↗</a>{% endif %}<button type="button" data-delete-target="{{ target.id }}">Kaldır</button></div>
         </article>
         {% endfor %}

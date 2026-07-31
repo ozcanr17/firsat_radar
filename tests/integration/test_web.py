@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 from httpx import AsyncClient
+from pydantic import SecretStr
 from typer.testing import CliRunner
 
 from app.cli import app
@@ -91,6 +92,50 @@ async def test_trade_desk_and_watchlist_api(client: AsyncClient) -> None:
     assert created.json()["refresh_due"] is True
     assert listed.json()["count"] == 1
     assert deleted.status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_marketplace_control_center_lists_connector_states(client: AsyncClient) -> None:
+    page = await client.get("/marketplaces")
+    response = await client.get("/api/v1/marketplaces")
+
+    assert page.status_code == 200
+    assert "Amazon Türkiye" in page.text
+    assert "MediaMarkt Türkiye" in page.text
+    assert response.status_code == 200
+    assert {item["key"] for item in response.json()} == {
+        "hepsiburada",
+        "amazon_tr",
+        "trendyol",
+        "mediamarkt_tr",
+    }
+    amazon = next(item for item in response.json() if item["key"] == "amazon_tr")
+    assert amazon["access_state"] == "credentials_required"
+
+
+@pytest.mark.asyncio
+async def test_admin_password_protects_cloud_panel(settings: Settings) -> None:
+    from httpx import ASGITransport
+
+    from app.main import create_app
+
+    protected_settings = settings.model_copy(
+        update={
+            "environment": "production",
+            "admin_password": SecretStr("very-secret-password"),
+        }
+    )
+    application = create_app(protected_settings)
+    transport = ASGITransport(app=application)
+    async with AsyncClient(transport=transport, base_url="http://test") as protected_client:
+        health = await protected_client.get("/healthz")
+        denied = await protected_client.get("/")
+        allowed = await protected_client.get("/", auth=("admin", "very-secret-password"))
+
+    assert health.status_code == 200
+    assert denied.status_code == 401
+    assert allowed.status_code == 200
+    application.state.engine.dispose()
 
 
 def test_direct_index_is_a_static_launcher() -> None:

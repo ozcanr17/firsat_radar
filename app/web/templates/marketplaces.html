@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Pazar Yerleri · {{ app_name }}{% endblock %}
+
+{% block content %}
+<section class="page-heading split-heading">
+    <div><span class="section-tag">VERİ BAĞLANTILARI</span><h1>Pazar yerleri</h1><p>Hangi mağazanın hangi yöntemle tarandığını, erişim eksiğini ve radar kapsamını tek ekrandan izle.</p></div>
+    <a class="button button-primary" href="{{ url_for('trade_desk_page') }}">Yeni hedef ekle</a>
+</section>
+
+<section class="marketplace-grid">
+    {% for item in marketplaces %}
+    <article class="marketplace-card state-{{ item.definition.access_state }}">
+        <div class="marketplace-card-top"><div><span class="section-tag">{{ item.definition.access_mode }}</span><h2>{{ item.definition.label }}</h2></div><span class="connector-state">{{ item.definition.state_label }}</span></div>
+        <p>{{ item.definition.description }}</p>
+        <div class="marketplace-stats"><div><strong>{{ item.product_count }}</strong><span>ürün</span></div><div><strong>{{ item.watch_count }}</strong><span>izleme hedefi</span></div></div>
+        <div class="capability-list">{% for capability in item.definition.capabilities %}<span>{{ capability }}</span>{% endfor %}</div>
+        <div class="connector-requirement"><strong>Gereken</strong><p>{{ item.definition.requirement }}</p></div>
+        <div class="marketplace-actions"><a href="{{ item.definition.base_url }}" target="_blank" rel="noreferrer">Mağazayı aç ↗</a>{% if item.definition.documentation_url %}<a href="{{ item.definition.documentation_url }}" target="_blank" rel="noreferrer">Erişim belgesi ↗</a>{% endif %}</div>
+    </article>
+    {% endfor %}
+</section>
+
+<section class="scope-callout">
+    <span>GÜVENLİ KAPSAM</span>
+    <div><h2>“Tüm pazarı taramak” kontrollü bağlantılarla büyür.</h2><p>Radar yalnızca herkese açık, izinli veya hesabına tanımlanmış kaynakları kullanır. Erişimi olmayan mağaza aktif gösterilmez; anahtar veya veri anlaşması bağlandığında aynı analiz hattına alınır.</p></div>
+</section>
+{% endblock %}

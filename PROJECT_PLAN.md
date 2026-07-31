@@ -72,8 +72,14 @@ Status: Complete.
 
 Add prioritized product/category watch targets, direct due-product refresh, review pain clusters, persisted unit economics, GO/NO-GO decisions, and a public browser-side profitability calculator.
 
-## Stage 12: Sitemap discovery and category briefs
+## Stage 12: Cloud control plane and multi-market foundation
 
-Status: Blocked by source acceptance.
+Status: Complete.
 
-Validate an advertised sitemap as XML without bypass behavior, discover only the three initial Anne & Bebek subcategories, and generate category-level commercial briefs from permitted product-page evidence.
+Package the full panel, persistent database, background scheduler, authentication, and browser runtime for GitHub-connected cloud deployment. Add an honest marketplace registry, multi-store watch targets, connector status UI, and an operator deployment guide.
+
+## Stage 13: Official marketplace connectors and category briefs
+
+Status: Requires external access.
+
+Connect Amazon Creators API credentials and approved Trendyol/MediaMarkt catalog feeds, normalize products into the common evidence model, then generate cross-market category briefs and price comparisons. Continue Hepsiburada sitemap acceptance work without bypass behavior.
