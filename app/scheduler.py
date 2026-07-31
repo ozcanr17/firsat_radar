@@ -106,6 +106,7 @@ class ScheduledPipeline:
         watchlist: CatalogOperation | None = None,
         sleeper: Callable[[float], Awaitable[None]] = asyncio.sleep,
         now_provider: Callable[[], datetime] | None = None,
+        source_isolated: bool = False,
     ) -> None:
         self.settings = settings
         self.crawler = crawler
@@ -117,6 +118,7 @@ class ScheduledPipeline:
         self.watchlist = watchlist
         self.sleeper = sleeper
         self.now_provider = now_provider or (lambda: datetime.now(UTC))
+        self.source_isolated = source_isolated
         self.lock_path = settings.data_dir / "runtime" / "scheduled-crawl.lock"
 
     async def run(self) -> ScheduledRunSummary:
@@ -180,6 +182,29 @@ class ScheduledPipeline:
                     status="failed",
                     crawl_status=None,
                     attempts=self.settings.retry_attempts,
+                    analyses_created=0,
+                    raw_files_deleted=0,
+                    backup_path=str(backup_result.path),
+                    error_code=error_code,
+                )
+            if crawl_summary.status not in SUCCESS_STATUSES and self.source_isolated:
+                error_code = crawl_summary.error_code or crawl_summary.status.value
+                retention_at = self.now_provider()
+                self.retention.prune(
+                    self.settings.raw_retention_days,
+                    now=retention_at,
+                    dry_run=False,
+                )
+                self.runtime_state.mark_degraded(
+                    self.now_provider(),
+                    error_code,
+                    backup_at=started_at,
+                    retention_at=retention_at,
+                )
+                return ScheduledRunSummary(
+                    status="sources_degraded",
+                    crawl_status=crawl_summary.status.value,
+                    attempts=attempts,
                     analyses_created=0,
                     raw_files_deleted=0,
                     backup_path=str(backup_result.path),

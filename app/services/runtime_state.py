@@ -78,6 +78,26 @@ class RuntimeStateService:
                 state.circuit_open_until = finished_at + timedelta(hours=cooldown_hours)
             return snapshot(state)
 
+    def mark_degraded(
+        self,
+        finished_at: datetime,
+        error_code: str,
+        backup_at: datetime | None = None,
+        retention_at: datetime | None = None,
+    ) -> RuntimeSnapshot:
+        with self.session_factory.begin() as session:
+            state = self._get_or_create(session)
+            state.scheduler_status = "sources_degraded"
+            state.last_job_finished_at = finished_at
+            state.last_error_code = error_code
+            state.consecutive_failures = 0
+            state.circuit_open_until = None
+            if backup_at is not None:
+                state.last_backup_at = backup_at
+            if retention_at is not None:
+                state.last_retention_at = retention_at
+            return snapshot(state)
+
     def mark_skipped(self, status: str, error_code: str | None = None) -> RuntimeSnapshot:
         with self.session_factory.begin() as session:
             state = self._get_or_create(session)

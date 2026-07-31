@@ -108,6 +108,7 @@ def build_pipeline(
     crawler: FakeCrawler,
     catalog: FakeCatalog | None = None,
     watchlist: FakeCatalog | None = None,
+    source_isolated: bool = False,
 ) -> tuple[
     ScheduledPipeline,
     RuntimeStateService,
@@ -140,6 +141,7 @@ def build_pipeline(
         watchlist=watchlist,
         sleeper=sleeper,
         now_provider=lambda: datetime(2026, 7, 31, tzinfo=UTC),
+        source_isolated=source_isolated,
     )
     return pipeline, runtime, analyzer, backup, retention, waits, engine
 
@@ -322,4 +324,33 @@ def test_scheduler_has_single_instance_and_coalescing(settings: Settings) -> Non
     assert job is not None
     assert job.max_instances == 1
     assert job.coalesce is True
+    engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_source_isolated_failure_does_not_open_global_circuit(
+    settings: Settings,
+) -> None:
+    crawler = FakeCrawler([])
+    catalog = FakeCatalog(crawl_summary(RunStatus.BLOCKED, "listing_security_block"))
+    pipeline, runtime, analyzer, backup, retention, _, engine = build_pipeline(
+        settings,
+        crawler,
+        catalog=catalog,
+        source_isolated=True,
+    )
+
+    first = await pipeline.run()
+    second = await pipeline.run()
+    state = runtime.get()
+
+    assert first.status == "sources_degraded"
+    assert first.error_code == "listing_security_block"
+    assert second.status == "sources_degraded"
+    assert state.circuit_is_open(datetime(2026, 8, 1, tzinfo=UTC)) is False
+    assert state.consecutive_failures == 0
+    assert len(catalog.page_counts) == 2
+    assert backup.calls == 2
+    assert retention.calls == 2
+    assert analyzer.calls == 0
     engine.dispose()

@@ -118,4 +118,5 @@ def build_pipeline(settings: Settings, session_factory: SessionFactory) -> Sched
         runtime_state=RuntimeStateService(session_factory),
         catalog=collector,
         watchlist=None,
+        source_isolated=True,
     )
