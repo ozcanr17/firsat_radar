@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -8,6 +9,8 @@ from typer.testing import CliRunner
 from app.cli import app
 from app.config import Settings
 from app.db.migrations import upgrade_database
+from app.db.session import SessionFactory
+from app.services.source_state import SourceStateService
 from app.services.static_site import export_static_site
 
 
@@ -132,6 +135,8 @@ async def test_marketplace_control_center_lists_connector_states(client: AsyncCl
     assert "MediaMarkt Türkiye" in page.text
     assert response.status_code == 200
     assert {item["key"] for item in response.json()} == {
+        "akakce",
+        "vatan",
         "hepsiburada",
         "amazon_tr",
         "trendyol",
@@ -139,6 +144,8 @@ async def test_marketplace_control_center_lists_connector_states(client: AsyncCl
     }
     amazon = next(item for item in response.json() if item["key"] == "amazon_tr")
     assert amazon["access_state"] == "credentials_required"
+    vatan = next(item for item in response.json() if item["key"] == "vatan")
+    assert vatan["access_state"] == "active"
 
 
 @pytest.mark.asyncio
@@ -214,3 +221,27 @@ def test_static_site_export_has_safe_empty_state(settings: Settings, tmp_path: P
     assert "kâr, satış veya üretim başarısı garantisi vermez" in html
     assert "Hızlı kârlılık testi" in html
     assert (tmp_path / "public" / ".nojekyll").exists()
+
+
+@pytest.mark.asyncio
+async def test_marketplace_page_reports_per_source_collection_state(
+    client: AsyncClient,
+    session_factory: SessionFactory,
+) -> None:
+    state = SourceStateService(session_factory)
+    state.mark_success("vatan", datetime(2026, 8, 1, 9, 30, tzinfo=UTC))
+    state.mark_failure(
+        "hepsiburada",
+        datetime(2026, 8, 1, 9, 0, tzinfo=UTC),
+        "listing_security_block",
+        threshold=1,
+        cooldown_hours=24,
+        force_open=True,
+    )
+
+    page = await client.get("/marketplaces")
+
+    assert page.status_code == 200
+    assert "Son tarama başarılı" in page.text
+    assert "Devre kesici açık" in page.text
+    assert "listing_security_block" in page.text

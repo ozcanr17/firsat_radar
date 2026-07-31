@@ -1,8 +1,9 @@
 from dataclasses import dataclass
+from datetime import datetime
 
 from sqlalchemy import func, select
 
-from app.db.models import Product, Source, WatchTarget
+from app.db.models import Product, Source, SourceRuntimeState, WatchTarget
 from app.db.session import SessionFactory
 
 
@@ -25,9 +26,52 @@ class MarketplaceView:
     definition: MarketplaceDefinition
     product_count: int
     watch_count: int
+    runtime_status: str = "idle"
+    last_run_at: datetime | None = None
+    last_success_at: datetime | None = None
+    circuit_open_until: datetime | None = None
+    last_error_code: str | None = None
+
+    @property
+    def runtime_label(self) -> str:
+        return RUNTIME_LABELS.get(self.runtime_status, self.runtime_status)
 
 
 MARKETPLACES = (
+    MarketplaceDefinition(
+        key="akakce",
+        label="Akakçe",
+        base_url="https://www.akakce.com",
+        access_mode="robots.txt izinli HTTP + yapısal veri",
+        access_state="active",
+        state_label="Çalışıyor",
+        description=(
+            "Kategori sayfalarından ürünleri, ürün sayfalarından ise tüm satıcıların "
+            "fiyat, stok ve teslimat kanıtlarını toplar."
+        ),
+        requirement="robots.txt izin verdiği sürece ek kimlik bilgisi gerekmez.",
+        documentation_url="https://www.akakce.com/robots.txt",
+        capabilities=(
+            "Kategori keşfi",
+            "Pazar yerleri arası fiyat karşılaştırma",
+            "Satıcı yoğunluğu",
+        ),
+    ),
+    MarketplaceDefinition(
+        key="vatan",
+        label="Vatan Bilgisayar",
+        base_url="https://www.vatanbilgisayar.com",
+        access_mode="robots.txt izinli HTTP + yapısal veri",
+        access_state="active",
+        state_label="Çalışıyor",
+        description=(
+            "Kategori sayfalarından ürünleri; ürün sayfalarından fiyat, stok, puan, "
+            "marka ve üretici kodu (MPN) kanıtlarını toplar."
+        ),
+        requirement="robots.txt izin verdiği sürece ek kimlik bilgisi gerekmez.",
+        documentation_url="https://www.vatanbilgisayar.com/robots.txt",
+        capabilities=("Kategori keşfi", "Fiyat geçmişi", "Ürün kimliği (MPN) eşleme"),
+    ),
     MarketplaceDefinition(
         key="hepsiburada",
         label="Hepsiburada",
@@ -81,6 +125,15 @@ MARKETPLACES = (
 )
 MARKETPLACE_BY_KEY = {item.key: item for item in MARKETPLACES}
 
+RUNTIME_LABELS = {
+    "idle": "Henüz çalışmadı",
+    "running": "Çalışıyor",
+    "completed": "Son tarama başarılı",
+    "failed": "Son tarama başarısız",
+    "throttled": "Hız sınırı nedeniyle bekliyor",
+    "circuit_open": "Devre kesici açık",
+}
+
 
 def list_marketplaces(session_factory: SessionFactory) -> list[MarketplaceView]:
     with session_factory() as session:
@@ -94,13 +147,38 @@ def list_marketplaces(session_factory: SessionFactory) -> list[MarketplaceView]:
                 WatchTarget.source_name
             )
         ).all()
+        runtime_rows = session.scalars(select(SourceRuntimeState)).all()
         product_counts: dict[str, int] = {row[0]: row[1] for row in product_rows}
         watch_counts: dict[str, int] = {row[0]: row[1] for row in watch_rows}
-    return [
-        MarketplaceView(
-            definition=item,
-            product_count=int(product_counts.get(item.key, 0)),
-            watch_count=int(watch_counts.get(item.key, 0)),
-        )
-        for item in MARKETPLACES
-    ]
+        runtime_by_source = {row.source_name: row for row in runtime_rows}
+        return [
+            MarketplaceView(
+                definition=item,
+                product_count=int(product_counts.get(item.key, 0)),
+                watch_count=int(watch_counts.get(item.key, 0)),
+                runtime_status=(
+                    runtime_by_source[item.key].status if item.key in runtime_by_source else "idle"
+                ),
+                last_run_at=(
+                    runtime_by_source[item.key].last_run_at
+                    if item.key in runtime_by_source
+                    else None
+                ),
+                last_success_at=(
+                    runtime_by_source[item.key].last_success_at
+                    if item.key in runtime_by_source
+                    else None
+                ),
+                circuit_open_until=(
+                    runtime_by_source[item.key].circuit_open_until
+                    if item.key in runtime_by_source
+                    else None
+                ),
+                last_error_code=(
+                    runtime_by_source[item.key].last_error_code
+                    if item.key in runtime_by_source
+                    else None
+                ),
+            )
+            for item in MARKETPLACES
+        ]

@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 
 import pytest
@@ -7,12 +7,23 @@ from httpx import ASGITransport, AsyncClient
 
 from app.config import Settings
 from app.db.migrations import upgrade_database
+from app.db.session import SessionFactory, build_engine, build_session_factory
 from app.main import create_app
 
 
 @pytest.fixture
 def settings(tmp_path: Path) -> Settings:
     return Settings(environment="test", data_dir=tmp_path)
+
+
+@pytest.fixture
+def session_factory(settings: Settings) -> Iterator[SessionFactory]:
+    upgrade_database(settings)
+    engine = build_engine(settings)
+    try:
+        yield build_session_factory(engine)
+    finally:
+        engine.dispose()
 
 
 @pytest_asyncio.fixture

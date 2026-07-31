@@ -14,6 +14,13 @@
         <div class="marketplace-card-top"><div><span class="section-tag">{{ item.definition.access_mode }}</span><h2>{{ item.definition.label }}</h2></div><span class="connector-state">{{ item.definition.state_label }}</span></div>
         <p>{{ item.definition.description }}</p>
         <div class="marketplace-stats"><div><strong>{{ item.product_count }}</strong><span>ürün</span></div><div><strong>{{ item.watch_count }}</strong><span>izleme hedefi</span></div></div>
+        <div class="connector-runtime runtime-{{ item.runtime_status }}">
+            <strong>Toplama durumu</strong>
+            <p>{{ item.runtime_label }}</p>
+            {% if item.last_success_at %}<span>Son başarılı tarama: {{ item.last_success_at.strftime('%d.%m.%Y %H:%M') }} UTC</span>{% endif %}
+            {% if item.circuit_open_until %}<span>Devre kesici açık: {{ item.circuit_open_until.strftime('%d.%m.%Y %H:%M') }} UTC'ye kadar</span>{% endif %}
+            {% if item.last_error_code %}<span>Son hata kodu: {{ item.last_error_code }}</span>{% endif %}
+        </div>
         <div class="capability-list">{% for capability in item.definition.capabilities %}<span>{{ capability }}</span>{% endfor %}</div>
         <div class="connector-requirement"><strong>Gereken</strong><p>{{ item.definition.requirement }}</p></div>
         <div class="marketplace-actions"><a href="{{ item.definition.base_url }}" target="_blank" rel="noreferrer">Mağazayı aç ↗</a>{% if item.definition.documentation_url %}<a href="{{ item.definition.documentation_url }}" target="_blank" rel="noreferrer">Erişim belgesi ↗</a>{% endif %}</div>

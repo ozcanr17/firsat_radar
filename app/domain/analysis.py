@@ -20,6 +20,7 @@ class MetricSet:
     price_position: float | None
     coverage: float
     confidence: float
+    spread: float | None = None
 
 
 @dataclass(frozen=True)
@@ -36,6 +37,17 @@ class ProductAnalysisInput:
     detail_confidence: float | None
     stored_review_count: int
     negative_review_count: int
+    offer_prices: tuple[Decimal, ...] = ()
+    marketplaces: tuple[str, ...] = ()
+    seller_count: int | None = None
+
+    @property
+    def lowest_offer(self) -> Decimal | None:
+        return min(self.offer_prices) if self.offer_prices else None
+
+    @property
+    def highest_offer(self) -> Decimal | None:
+        return max(self.offer_prices) if self.offer_prices else None
 
 
 @dataclass(frozen=True)

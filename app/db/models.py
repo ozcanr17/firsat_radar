@@ -118,6 +118,7 @@ class ProductSnapshot(Base):
     rating: Mapped[float | None] = mapped_column(Float)
     review_count: Mapped[int | None] = mapped_column(Integer)
     rank: Mapped[int | None] = mapped_column(Integer)
+    seller_count: Mapped[int | None] = mapped_column(Integer)
     stock: Mapped[str | None] = mapped_column(String(120))
     coverage: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     confidence: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
@@ -146,6 +147,7 @@ class ProductDetail(Base):
 
 class Offer(Base):
     __tablename__ = "offers"
+    __table_args__ = (Index("ix_offers_product_observed", "product_id", "observed_at"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), nullable=False)
@@ -153,7 +155,13 @@ class Offer(Base):
     observed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
+    marketplace: Mapped[str | None] = mapped_column(String(120))
     seller: Mapped[str | None] = mapped_column(String(500))
+    price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    currency: Mapped[str | None] = mapped_column(String(8))
+    availability: Mapped[str | None] = mapped_column(String(40))
+    offer_url: Mapped[str | None] = mapped_column(String(2048))
+    stock_text: Mapped[str | None] = mapped_column(String(255))
     shipping_origin: Mapped[str | None] = mapped_column(String(255))
     delivery_text: Mapped[str | None] = mapped_column(String(1000))
 
@@ -202,6 +210,7 @@ class Analysis(Base):
     pain: Mapped[float | None] = mapped_column(Float)
     momentum: Mapped[float | None] = mapped_column(Float)
     price_position: Mapped[float | None] = mapped_column(Float)
+    price_spread: Mapped[float | None] = mapped_column(Float)
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
     coverage: Mapped[float] = mapped_column(Float, nullable=False)
     model_version: Mapped[str] = mapped_column(String(40), nullable=False)
@@ -244,6 +253,23 @@ class RuntimeState(Base):
     last_error_code: Mapped[str | None] = mapped_column(String(120))
     last_backup_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_retention_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+
+
+class SourceRuntimeState(Base):
+    __tablename__ = "source_runtime_state"
+    __table_args__ = (UniqueConstraint("source_name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), default="idle", nullable=False)
+    consecutive_failures: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    circuit_open_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error_code: Mapped[str | None] = mapped_column(String(120))
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
     )

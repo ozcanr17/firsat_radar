@@ -96,6 +96,50 @@ MAIN_CATEGORIES = (
     CategorySeed("Akıllı Ev, Yaşam", "https://www.hepsiburada.com/akilli-ev-yasam-c-80079038"),
 )
 
+AKAKCE_CATEGORIES = (
+    CategorySeed("Cep Telefonu", "https://www.akakce.com/cep-telefonu.html"),
+    CategorySeed("Laptop ve Notebook", "https://www.akakce.com/laptop-notebook.html"),
+    CategorySeed("Kulaklık", "https://www.akakce.com/kulaklik.html"),
+    CategorySeed("Akıllı Saat", "https://www.akakce.com/akilli-saat.html"),
+    CategorySeed("Televizyon", "https://www.akakce.com/televizyon.html"),
+    CategorySeed("Robot Süpürge", "https://www.akakce.com/robot-supurge.html"),
+    CategorySeed("Bebek Arabası", "https://www.akakce.com/bebek-arabasi.html"),
+    CategorySeed("Bebek Bezi", "https://www.akakce.com/bebek-bezi.html"),
+)
+
+AKAKCE_CATEGORY_PRIORITIES = {
+    "Cep Telefonu": 1000,
+    "Laptop ve Notebook": 950,
+    "Kulaklık": 900,
+    "Akıllı Saat": 850,
+    "Bebek Arabası": 800,
+    "Bebek Bezi": 780,
+    "Televizyon": 750,
+    "Robot Süpürge": 700,
+}
+
+VATAN_CATEGORIES = (
+    CategorySeed("Notebook", "https://www.vatanbilgisayar.com/notebook/"),
+    CategorySeed("Cep Telefonu", "https://www.vatanbilgisayar.com/cep-telefonu/"),
+    CategorySeed("Tablet", "https://www.vatanbilgisayar.com/tablet/"),
+    CategorySeed("Televizyon", "https://www.vatanbilgisayar.com/televizyon/"),
+    CategorySeed("Kulaklık", "https://www.vatanbilgisayar.com/kulaklik/"),
+    CategorySeed("Akıllı Saat", "https://www.vatanbilgisayar.com/akilli-saat/"),
+    CategorySeed("Ekran Kartı", "https://www.vatanbilgisayar.com/ekran-karti/"),
+    CategorySeed("Süpürge", "https://www.vatanbilgisayar.com/supurge/"),
+)
+
+VATAN_CATEGORY_PRIORITIES = {
+    "Notebook": 1000,
+    "Cep Telefonu": 950,
+    "Televizyon": 900,
+    "Kulaklık": 850,
+    "Akıllı Saat": 800,
+    "Tablet": 780,
+    "Ekran Kartı": 750,
+    "Süpürge": 700,
+}
+
 POPULAR_CATEGORY_PRIORITIES = {
     "Bilgisayar, Tablet": 1000,
     "Telefon": 950,
@@ -115,27 +159,29 @@ class CatalogMonitor:
         crawler: TargetCrawler | None,
         products_per_page: int,
         details_per_page: int = 0,
+        *,
+        source_name: str = "hepsiburada",
+        source_base_url: str = "https://www.hepsiburada.com",
+        seeds: tuple[CategorySeed, ...] = MAIN_CATEGORIES,
+        priorities: dict[str, int] | None = None,
+        paginated: bool = True,
     ) -> None:
         self.session_factory = session_factory
         self.crawler = crawler
         self.products_per_page = products_per_page
         self.details_per_page = details_per_page
+        self.source_name = source_name
+        self.source_base_url = source_base_url
+        self.seeds = seeds
+        self.priorities = POPULAR_CATEGORY_PRIORITIES if priorities is None else priorities
+        self.paginated = paginated
 
     def seed(self) -> int:
         created = 0
         with self.session_factory.begin() as session:
-            source = session.scalar(select(Source).where(Source.name == "hepsiburada"))
-            if source is None:
-                source = Source(
-                    name="hepsiburada",
-                    base_url="https://www.hepsiburada.com",
-                    enabled=True,
-                    policy_state="unknown",
-                )
-                session.add(source)
-                session.flush()
-            for seed in MAIN_CATEGORIES:
-                priority = POPULAR_CATEGORY_PRIORITIES.get(seed.name, 500)
+            source = self._get_or_create_source(session)
+            for seed in self.seeds:
+                priority = self.priorities.get(seed.name, 500)
                 existing = session.scalar(
                     select(CategoryCursor).where(
                         CategoryCursor.source_id == source.id,
@@ -162,11 +208,29 @@ class CatalogMonitor:
                 created += 1
         return created
 
+    def _get_or_create_source(self, session: Session) -> Source:
+        source = session.scalar(select(Source).where(Source.name == self.source_name))
+        if source is None:
+            source = Source(
+                name=self.source_name,
+                base_url=self.source_base_url,
+                enabled=True,
+                policy_state="unknown",
+            )
+            session.add(source)
+            session.flush()
+        return source
+
+    def _source_id(self, session: Session) -> int:
+        return self._get_or_create_source(session).id
+
     def categories(self) -> list[CategoryView]:
         self.seed()
         with self.session_factory() as session:
             rows = session.scalars(
-                select(CategoryCursor).order_by(
+                select(CategoryCursor)
+                .where(CategoryCursor.source_id == self._source_id(session))
+                .order_by(
                     CategoryCursor.priority.desc(),
                     CategoryCursor.name,
                 )
@@ -242,27 +306,36 @@ class CatalogMonitor:
     def status(self) -> CatalogStatus:
         self.seed()
         with self.session_factory() as session:
-            category_count = session.scalar(select(func.count()).select_from(CategoryCursor)) or 0
+            scope = CategoryCursor.source_id == self._source_id(session)
+            category_count = (
+                session.scalar(select(func.count()).select_from(CategoryCursor).where(scope)) or 0
+            )
             enabled_count = (
                 session.scalar(
-                    select(func.count()).select_from(CategoryCursor).where(CategoryCursor.enabled)
+                    select(func.count())
+                    .select_from(CategoryCursor)
+                    .where(scope, CategoryCursor.enabled)
                 )
                 or 0
             )
-            pages_scanned = session.scalar(select(func.sum(CategoryCursor.pages_scanned))) or 0
+            pages_scanned = (
+                session.scalar(select(func.sum(CategoryCursor.pages_scanned)).where(scope)) or 0
+            )
             sweeps_completed = (
-                session.scalar(select(func.sum(CategoryCursor.sweeps_completed))) or 0
+                session.scalar(select(func.sum(CategoryCursor.sweeps_completed)).where(scope)) or 0
             )
             pending_count = (
                 session.scalar(
                     select(func.count())
                     .select_from(CategoryCursor)
-                    .where(CategoryCursor.enabled, CategoryCursor.sweeps_completed == 0)
+                    .where(scope, CategoryCursor.enabled, CategoryCursor.sweeps_completed == 0)
                 )
                 or 0
             )
             next_category = self._next_category_in_session(session)
-            last_crawled_at = session.scalar(select(func.max(CategoryCursor.last_crawled_at)))
+            last_crawled_at = session.scalar(
+                select(func.max(CategoryCursor.last_crawled_at)).where(scope)
+            )
         return CatalogStatus(
             category_count=category_count,
             enabled_count=enabled_count,
@@ -276,7 +349,9 @@ class CatalogMonitor:
 
     def reset_progress(self) -> int:
         with self.session_factory.begin() as session:
-            categories = session.scalars(select(CategoryCursor)).all()
+            categories = session.scalars(
+                select(CategoryCursor).where(CategoryCursor.source_id == self._source_id(session))
+            ).all()
             for category in categories:
                 category.next_page = 1
                 category.page_size = None
@@ -296,11 +371,13 @@ class CatalogMonitor:
             session.expunge(category)
             return category
 
-    @staticmethod
-    def _next_category_in_session(session: Session) -> CategoryCursor | None:
+    def _next_category_in_session(self, session: Session) -> CategoryCursor | None:
         return session.scalar(
             select(CategoryCursor)
-            .where(CategoryCursor.enabled)
+            .where(
+                CategoryCursor.enabled,
+                CategoryCursor.source_id == self._source_id(session),
+            )
             .order_by(
                 CategoryCursor.last_crawled_at.is_not(None),
                 CategoryCursor.last_crawled_at,
@@ -324,6 +401,12 @@ class CatalogMonitor:
                 and summary.listing_signature == category.last_signature
             )
             category.pages_scanned += 1
+            if not self.paginated:
+                category.next_page = 1
+                category.sweeps_completed += 1
+                category.last_completed_at = now
+                category.last_signature = summary.listing_signature
+                return
             if page == 1 and summary.products_seen > 0:
                 category.page_size = summary.products_seen
                 category.next_page = 2

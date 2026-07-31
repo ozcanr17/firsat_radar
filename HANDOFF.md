@@ -2,7 +2,7 @@
 
 ## Read this first
 
-This repository is the user's production market-research application. The user wants a cloud-hosted, continuously running system that can discover popular marketplace categories, inspect products and visible review evidence, compare commercial opportunities, and turn evidence into resale, sourcing, or local-production recommendations.
+This repository is the user's production market-research application. The user wants a cloud-hosted, continuously running system that can discover popular marketplace categories, inspect products and visible evidence, compare commercial opportunities, and turn evidence into resale, sourcing, or local-production recommendations.
 
 Communicate with the user in Turkish. Write clean code without code comments. At the end of every completed stage, update this file, commit to `main`, push to GitHub, wait for CI, and verify the Railway deployment. Never describe uncollected, simulated, or cached fixture data as live market evidence.
 
@@ -10,8 +10,7 @@ Communicate with the user in Turkish. Write clean code without code comments. At
 
 - Repository: `https://github.com/ozcanr17/firsat_radar`
 - Branch: `main`
-- Release: `1.7.0`
-- Last functional commit before this handoff: `b96b615`
+- Release: `1.8.0`
 - Railway panel: `https://firsatradar-production.up.railway.app/`
 - Public GitHub Pages snapshot: `https://ozcanr17.github.io/firsat_radar/`
 - Deployment guide: `docs/CLOUD_DEPLOYMENT.md`
@@ -20,176 +19,150 @@ Communicate with the user in Turkish. Write clean code without code comments. At
 
 The Railway service hosts the password-protected FastAPI panel, persistent SQLite database, Playwright browser runtime, and embedded scheduler. GitHub Pages is only a static public snapshot and cannot run the Python service, database, or bot.
 
-## Current task
+## Current state: the radar now collects real market data
 
-The immediate task is to make marketplace category targeting work correctly and evolve the system into a source-aware category traversal engine.
+Before this stage the application had no working data source in production. Hepsiburada was blocked, and every other connector was a placeholder. The system could not find anything.
 
-The triggering example is this Amazon Türkiye category URL:
+It now collects live, permitted market evidence from two working sources and derives opportunities from it.
 
-`https://www.amazon.com.tr/gp/browse.html?node=12466208031&ref_=nav_em_ba_babyall_0_2_4_19`
+### Verified working sources
 
-The user expects an agent to accept a category URL, discover its subcategories, queue those subcategories, inspect products, enrich product details and visible reviews where permitted, and continue monitoring over time without needing the user's local computer.
+`vatan` — Vatan Bilgisayar, a Turkish retailer on its own infrastructure.
 
-## Completed work
+- Plain HTTPS with a self-identifying bot user agent, no browser required.
+- `robots.txt` grants `User-agent: *` access to category and product pages.
+- Product pages publish complete schema.org `Product` JSON-LD: price, availability, brand, rating, review count, SKU, and **MPN**. MPN is the key for cross-market product identity in Stage 16.
+- Verified live: policy allowed, 24 products parsed per category page, full pipeline run created 12 products, 12 snapshots, 12 analyses and opportunities.
 
-### Cloud and interface
+`akakce` — Akakçe, a price-comparison engine.
 
-- Built the full FastAPI panel and bot for Railway with a persistent `/data` volume.
-- Added HTTP Basic authentication for the cloud panel.
-- Rebuilt `/` as the unified Radar Center.
-- Added product, opportunity, commercial-recommendation, trade-desk, marketplace, run-history, and settings pages.
-- Added the live agent state, queue state, category coverage, product observations, opportunity summaries, and manual `Şimdi tara` control to the Radar Center.
-- Added a marketplace selector to the quick-target form.
-- Added automatic marketplace detection when a URL is pasted.
-- Verified the desktop UI and Amazon URL auto-detection in the in-app browser.
+- Same permitted plain-HTTP approach.
+- Product pages publish schema.org `ProductGroup` with `AggregateOffer`: `offerCount`, `lowPrice`, `highPrice`, and per-seller price, availability, seller name, and the real destination marketplace URL.
+- This yields genuine **cross-marketplace price spread from a single permitted source**, without crawling Hepsiburada or Trendyol directly. Verified real example: the same MacBook Air listed at `37.999,00 TL` on Hepsiburada and `45.839,05 TL` on Pttavm — a 17.1% spread across three marketplaces, scored as `price_arbitrage` with the offer evidence attached.
+- Listing pages expose `data-pr` (product id) and `data-cp` (seller count).
 
-### Scheduler and collection
+Both sources were reached with an honest `FirsatRadar/1.8` user agent. Nothing is spoofed.
 
-- The embedded scheduler starts a guarded cycle at service startup and then repeats hourly.
-- A cycle processes up to three due watch targets and three round-robin catalog pages.
-- Collection is sequential, delayed by 6–12 seconds, and capped at 800 external requests per UTC day.
-- Non-overlap protection, retry handling, a circuit breaker, raw-evidence retention, backups, review analysis, and opportunity analysis run in the same pipeline.
-- Direct Hepsiburada product targets can be discovered, persisted, refreshed, and linked back to their watch targets.
-- Structured product-page price, old price, rating, review count, image, product details, and already-visible review evidence are persisted with provenance.
-- Product refreshes create new snapshots and retain prior listing values when structured product data omits a field.
+### Real opportunity scoring
 
-### Marketplace-aware targets
+The scoring model is now `rules-tr-v3`. It adds a `spread` metric computed from observed merchant offers:
 
-- Fixed the bug where the Radar Center always submitted `source_name: "hepsiburada"`, which caused Amazon URLs to fail with `invalid_marketplace_url`.
-- Amazon category URLs now preserve the allowlisted `node` parameter and discard tracking parameters such as `ref_`.
-- Amazon product targets validate ASINs from `/dp/{ASIN}` and `/gp/product/{ASIN}` paths.
-- The watchlist monitor now has a source-aware crawler registry rather than assuming one crawler for every target.
-- `ListingResult` now carries normalized child-category links.
-- Permitted Hepsiburada category pages can extract same-marketplace child-category links.
-- Child targets are URL-deduplicated, queued with lower priority, limited to 40 links per page, and limited to a configurable six-level traversal depth.
-- Category-only landing pages can expand into child targets even when they contain no product cards.
-- The new settings are `FIRSAT_RADAR_CATEGORY_DISCOVERY_LINKS_PER_PAGE` and `FIRSAT_RADAR_CATEGORY_DISCOVERY_MAX_DEPTH`.
+- `spread = (highest_offer - lowest_offer) / highest_offer * 100`, only when at least two offers exist.
+- Pattern `price_arbitrage` fires at `spread >= 12%`.
+- Reasons carry the concrete evidence: lowest offer, highest offer, offer count, marketplace names.
+- Risks include `single_offer_no_spread` and `spread_within_single_marketplace` so a one-seller observation is never presented as an arbitrage finding.
+- Weights were rebalanced so that when `spread` is absent the remaining five metrics keep exactly their previous relative ratios. Historic scores are unchanged apart from one 0.01 float rounding difference.
+- Coverage treats "fewer than two offers" as *not applicable* rather than *missing*, so single-seller retailers are not unfairly penalised.
 
-### Verification
+### Stage 15A completed: per-source circuit isolation
 
-- Ruff lint: passed.
-- Ruff format: passed.
-- Mypy strict mode: passed.
-- Pytest: 58 tests passed.
-- CLI doctor: passed.
-- GitHub Actions run `30662885573`: passed.
-- Railway served the new deployment after commit `b96b615`.
-- The production `/healthz` endpoint returned HTTP 200 with a healthy database.
-- The worktree was clean and synchronized with `origin/main` before this handoff update.
+The global circuit breaker no longer stops every source.
+
+- New table `source_runtime_state` with per-source status, consecutive failures, circuit window, last error, last run, and last success.
+- `MultiSourceCollector` (`app/services/collection.py`) runs each source independently. A failure opens only that source's circuit; an open circuit skips only that source.
+- The overall cycle reports `completed` when at least one source succeeded, so analysis still runs.
+- Rate limiting is treated as backpressure, not a fault: `_rate_limited`, `_rate_limit_cooldown`, and `daily_quota_reached` mark the source `throttled` **without** incrementing failures or opening the circuit.
+- `WatchlistMonitor` and `CatalogMonitor` are both source-scoped now. `CatalogMonitor` queries filter by `source_id`, and a `paginated=False` profile keeps sources whose robots.txt forbids pagination on page 1.
+- Per-source state is shown on `/marketplaces` with status, last successful scan, circuit window, and error code.
+
+This was verified live, not just in tests: in a real pipeline run Akakçe was blocked and opened its own circuit while Vatan completed successfully and the cycle still produced 12 analyses.
+
+### Politeness and safety
+
+- Per-source delays: Vatan 15–25s, Akakçe 25–45s, each with its own persisted last-request timestamp.
+- Per-source daily quotas: Vatan 500, Akakçe 400.
+- `RateLimitCooldown` persists a backoff window and honours `Retry-After`.
+- HTTP 403 is a hard block; 429 is a throttle with cooldown; challenge interstitials (`Just a moment...`) engage the cooldown and stop.
+- Robots policy is generic and per-source (`app/sources/robots.py`), cached per source.
 
 ## Current blockers
 
-### Amazon Türkiye is registered but intentionally inactive
+### Akakçe is behind Cloudflare and is currently challenged
 
-Amazon browse targets can now be saved and retain their browse-node identity, but they are not automatically crawled. `MARKETPLACES` currently marks `amazon_tr` as `credentials_required`, so `watch_target_view()` sets `refresh_due` to false for Amazon targets.
+While validating seed category URLs I sent roughly thirty requests in a short window and tripped Cloudflare. Akakçe now returns a `Just a moment...` interstitial for HTML pages from this IP, while `robots.txt` still returns 200.
 
-This is deliberate. Amazon's published terms exclude product-list, description, and price collection through robots, data mining, or similar extraction tools from the granted license. Do not activate a public-page Amazon crawler, circumvent restrictions, or imply that a visible page grants permission.
+The collector detects this and stops. **Do not attempt to solve, bypass, or evade the challenge.** The correct response is to wait; the per-source circuit and cooldown already handle it. The delays were raised to 25–45s specifically because of this.
 
-The approved implementation path is Amazon Creators API or explicit written automation permission. Creators API requires Amazon Associates acceptance and generated credentials. Relevant official documentation:
+It is not yet confirmed whether Railway's egress IP is challenged. Check `/marketplaces` after deployment: if `akakce` shows `circuit_open` with `listing_access_denied`, it is challenged there too, and Vatan carries the system until it clears.
 
-- `https://affiliate-program.amazon.com/creatorsapi/docs/en-us/onboarding/register-for-creators-api`
-- `https://affiliate-program.amazon.com/creatorsapi/docs/en-us/api-reference`
-- `https://affiliate-program.amazon.com/creatorsapi/docs/en-us/api-reference/resources`
+### Hepsiburada is blocked at the network edge, not just from Railway
 
-No Amazon credential has been provided. Do not ask the user to paste secrets into chat or commit them. Credentials must be stored as Railway environment variables after the connector defines exact variable names.
+The previous handoff attributed this to the Railway egress IP. That was wrong. `https://www.hepsiburada.com/robots.txt` returns **HTTP 403 from an ordinary residential IP as well**. The block is not Railway-specific.
 
-### Hepsiburada is blocked from the current Railway egress IP
+`FIRSAT_RADAR_HEPSIBURADA_ENABLED` now defaults to `false`. Its Playwright path also needs a headed browser, which Railway cannot provide. Leave it disabled unless a permitted access route appears.
 
-The production Playwright session received a Hepsiburada security page while requesting `robots.txt`. The collector stopped correctly and did not bypass it.
+### Amazon Türkiye remains intentionally inactive
 
-At the last verification, `/healthz` reported:
+Amazon browse targets are saved and retain their browse-node identity but are not crawled. `MARKETPLACES` marks `amazon_tr` as `credentials_required`.
 
-- `scheduler_status`: `circuit_open`
-- `consecutive_failures`: `2`
-- `circuit_open_until`: `2026-08-01T20:02:00Z`, which is `2026-08-01 23:02` in Europe/Istanbul
-
-The circuit state came from the earlier Hepsiburada source failure and is stored in the persistent database. Do not reset the circuit merely to force another blocked request. First confirm that the source policy endpoint is reachable and allowed from the runtime.
-
-### The circuit breaker is global
-
-One source failure can currently block the whole scheduled pipeline. This will become incorrect once multiple marketplace connectors are active. A Hepsiburada failure must not prevent a permitted Amazon API or approved feed connector from running.
-
-### The user's Amazon target may still need to be re-added
-
-The original `invalid_marketplace_url` request failed before persistence. The user should hard-refresh the live Radar Center, choose `Kategori`, paste the Amazon Baby URL, and submit it again. The expected result is a saved Amazon target with a `credentials_required` state, not an active crawl.
+This is deliberate. Amazon's terms exclude product-list, description, and price collection through robots or similar extraction tools. Do not activate a public-page Amazon crawler or imply that a visible page grants permission. The approved path is the Creators API with Associates credentials stored as Railway environment variables. No credential has been provided.
 
 ## Next implementation plan
 
-### Stage 15A: Source-isolated runtime controls
+### Stage 16: cross-market product identity
 
-1. Replace the single global collection circuit with per-source circuit state.
-2. Ensure a blocked Hepsiburada connector cannot stop other permitted connectors.
-3. Expose each source's last run, next retry, policy state, and error reason in the marketplace UI.
-4. Keep a small global circuit only for application-wide database or scheduler failures.
-5. Add integration tests covering one failed source and one successful source in the same cycle.
+1. Match products across sources using MPN, GTIN/EAN, brand, and normalized title with a confidence score. Vatan already supplies MPN and SKU; Akakçe supplies brand and a normalized title.
+2. Persist an identity cluster so the same physical product from Vatan and from an Akakçe merchant offer resolves to one entity.
+3. Compute spread across *sources*, not only within one Akakçe page. This is the largest remaining unlock: it turns two independent feeds into a genuine arbitrage table.
 
-### Stage 15B: Official Amazon Creators API connector
+### Stage 17: category briefs and notifications
 
-1. Verify current official Creators API authentication, Turkish marketplace locale support, rate limits, browse-node operations, search operations, and available product resources.
-2. Add explicit Railway settings for Credential ID, Credential Secret, credential version, partner tag, and marketplace locale.
-3. Implement OAuth token acquisition and bounded retry/throttling behavior without logging secrets.
-4. Implement `GetBrowseNodes` for the category hierarchy.
-5. Implement `SearchItems` for products in each browse node.
-6. Implement `GetItems` only for the product resources needed by the common evidence model.
-7. Register the Amazon crawler in `build_pipeline()` only when configuration is complete.
-8. Change the marketplace state dynamically from `credentials_required` to `active` only after a successful authenticated health check.
-9. Do not invent review text if Creators API does not provide reviews. Store explicit unavailability reason codes and keep review-derived scores disabled for that source.
-10. Add contract tests with recorded, redacted fixtures and an opt-in live smoke test that makes the smallest possible API request.
+1. Category briefs: demand, price bands, seller concentration (`seller_count` is already collected), and data confidence.
+2. Durable notifications for material price moves, new arbitrage spreads, and margin-qualified opportunities.
+3. Separate resale, wholesale sourcing, and local-production recommendations, each requiring explicit evidence, costs, risks, and a validation plan before showing `GO`.
 
-### Stage 15C: Commercial usefulness
+### Stage 18: additional permitted sources
 
-1. Add cross-market product identity using GTIN/EAN, brand, model, normalized title, and confidence-scored matching.
-2. Build category briefs showing demand, price bands, seller concentration, review pain clusters, margin scenarios, and data confidence.
-3. Add durable notifications for material price moves, rising products, repeated complaint clusters, and margin-qualified opportunities.
-4. Separate resale, wholesale sourcing, and local-production recommendations.
-5. Require explicit evidence, costs, risks, and a validation plan before showing `GO`.
-6. Integrate approved Trendyol and MediaMarkt feeds only after access agreements or official connector credentials exist.
+1. Cimri was verified reachable and permitted (`robots.txt` 200, category pages 200 with an honest bot UA) but has no adapter yet. It is a comparison engine like Akakçe and would add redundancy.
+2. Amazon Creators API once credentials exist.
+3. Trendyol and MediaMarkt only after access agreements.
 
 ## Important architecture locations
 
-- `app/config.py`: runtime settings and safety limits
-- `app/bootstrap.py`: production crawler and scheduler assembly
+- `app/config.py`: runtime settings, per-source delays, quotas, enablement flags
+- `app/bootstrap.py`: per-source crawler registry, catalog profiles, pipeline assembly
 - `app/scheduler.py`: guarded scheduled pipeline and global circuit behavior
-- `app/services/crawl.py`: generic crawl persistence and child-category target creation
+- `app/services/collection.py`: **per-source isolation and circuit routing**
+- `app/services/source_state.py`: per-source runtime state
+- `app/services/crawl.py`: generic crawl persistence, merchant offers, child-category targets
+- `app/services/catalog.py`: source-scoped category cursors and seed profiles
 - `app/services/watchlist.py`: source-aware watch-target routing
-- `app/services/commerce.py`: marketplace URL normalization and watch-target validation
-- `app/services/marketplaces.py`: connector definitions and access states
-- `app/sources/base.py`: source adapter protocol
-- `app/sources/hepsiburada/browser.py`: rendered browser adapter and category-link discovery
-- `app/sources/hepsiburada/parser.py`: product and category normalization
-- `app/sources/amazon_tr/parser.py`: current ASIN parser; this is not yet an API connector
-- `app/web/templates/dashboard.html`: Radar Center quick-target UI and URL auto-detection
-- `app/web/templates/marketplaces.html`: connector status page
-- `tests/integration/test_crawl.py`: persistence, product refresh, watchlist, and category traversal tests
-- `tests/integration/test_scheduler.py`: pipeline and circuit behavior tests
-- `tests/integration/test_web.py`: panel and API behavior tests
+- `app/services/marketplaces.py`: connector definitions, access states, runtime status
+- `app/analysis/scoring.py`: `rules-tr-v3` including the spread metric
+- `app/sources/robots.py`: generic per-source robots policy
+- `app/sources/throttle.py`: rate limiter, daily quota, rate-limit cooldown
+- `app/sources/http_source.py`: shared permitted-HTTP adapter base
+- `app/sources/vatan/`: Vatan parser and adapter
+- `app/sources/akakce/`: Akakçe parser and adapter
+- `tests/integration/test_collection.py`: per-source circuit isolation tests
 
 ## Pitfalls encountered
 
-- The quick-target JavaScript hardcoded Hepsiburada even when the user pasted an Amazon URL. Source selection must always come from an explicit form value or verified hostname detection.
-- Generic URL canonicalization removed every query parameter. That destroyed Amazon's `node` category identity. Query normalization must use per-source allowlists, not an all-or-nothing rule.
-- A category landing page can contain subcategory links without product cards. Treating zero product cards as immediate parser drift prevented traversal before child links were persisted.
-- The first child-category bound was 12, but the user's visible Amazon Baby category already had more branches. Traversal limits must be configurable and large enough for the visible taxonomy while remaining bounded.
-- The original crawler and product linker assumed Hepsiburada globally. New code must resolve source, external identity extraction, policy URL, and adapter through a connector registry.
-- A global circuit breaker is acceptable for a one-source prototype but becomes a cross-market outage in a multi-source system.
-- GitHub Pages cannot host FastAPI, SQLite, Playwright, or an always-on scheduler. The static Pages snapshot and the Railway control plane must never be conflated.
-- Railway can serve stale artifacts briefly while a deployment is building. Verify both GitHub Actions success and an observable new Railway artifact before declaring a release live.
+- The previous handoff's diagnosis that Hepsiburada was blocked "from the Railway egress IP" was not verified. It returns 403 from a residential IP too. Always reproduce a network claim before designing around it.
+- Validating seed URLs with a fast loop tripped Cloudflare on Akakçe and cost hours of usable access. Probe third-party sites at the same rate the production collector uses, not faster.
+- `Accept: text/html` alone makes some servers return HTTP 406 for `robots.txt`. Include `text/plain`.
+- A 429 is not a permanent block. Treating it as one opened a 24-hour circuit on a source that would have recovered in minutes. Rate limits are backpressure and need their own state.
+- Vatan renders two `.product-list__content` blocks per product; only one holds the anchor. Resolve the link from the card *or its ancestor*, and do not count deduplicated repeats as parse failures — that pushed coverage to 0.71, barely above the drift threshold, for a page that parsed perfectly.
+- JSON-LD inside `<script>` is not entity-decoded by the HTML parser. Unescape it explicitly, or titles keep `&quot;`.
+- A module-level `import html` collides with a parameter named `html`. Import `unescape` directly.
+- Adding a sixth scoring metric changes every historic score unless the weights are chosen so the remaining metrics keep their prior ratios after renormalization.
+- `CatalogMonitor` originally queried `CategoryCursor` with no source filter. Any second source silently shared and corrupted the first source's cursor state.
 - Browser-visible data is not automatically licensed for automated commercial collection. Technical accessibility and authorization are separate gates.
 
 ## Never do these again
 
 - Never bypass robots rules, HTTP 403/429, CAPTCHA, security interstitials, login controls, or marketplace access restrictions.
 - Never add proxy rotation, stealth evasion, fingerprint spoofing, hidden/private endpoint use, or CAPTCHA-solving automation.
-- Never claim Amazon, Trendyol, or MediaMarkt collection is active when only a target record or connector placeholder exists.
-- Never hardcode a source name in a multi-market form, service, product linker, or scheduler path.
-- Never strip required marketplace identity parameters such as Amazon `node`; preserve only explicit per-source allowlists and remove tracking parameters.
+- Never claim a marketplace is being collected when only a target record or connector placeholder exists.
+- Never hardcode a source name in a multi-market form, service, product linker, catalog, or scheduler path.
+- Never strip required marketplace identity parameters such as Amazon `node`.
 - Never launch unbounded recursive traversal. Deduplicate URLs, cap breadth and depth, apply source rate limits, and process through a persistent queue.
-- Never let one source's policy or security failure silently stop every other source.
+- Never let one source's policy or security failure stop every other source.
 - Never fabricate review content, ratings, demand, price history, opportunity evidence, or commercial recommendations.
 - Never publish raw reviewer identities or secrets.
 - Never commit `.env`, Railway credentials, runtime databases, raw evidence, browser profiles, backups, watch targets, or business cases.
 - Never weaken tests or safety gates merely to make a live crawl appear successful.
-- Never reset the production circuit repeatedly against a known security block.
+- Never probe a third-party site faster than the production collector would.
 - Never finish a stage without updating `HANDOFF.md`, running the full quality suite, committing `main`, pushing, and checking the deployment.
 
 ## Required verification commands

@@ -7,7 +7,7 @@ import pytest
 
 from app.domain.crawl import RunStatus, SourceAccessError
 from app.services.raw_store import RawStore
-from app.sources.hepsiburada.browser import DAILY_REQUEST_LIMIT, DailyRequestQuota
+from app.sources.throttle import DAILY_REQUEST_LIMIT, DailyRequestQuota
 
 
 def test_raw_retention_supports_dry_run_and_bounded_delete(tmp_path: Path) -> None:

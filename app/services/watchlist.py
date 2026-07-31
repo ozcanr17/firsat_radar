@@ -33,10 +33,15 @@ class WatchlistMonitor:
         session_factory: SessionFactory,
         crawler: CrawlService,
         crawlers: dict[str, CrawlService] | None = None,
+        source_names: frozenset[str] | None = None,
     ) -> None:
         self.session_factory = session_factory
         self.crawler = crawler
         self.crawlers = {crawler.source_name: crawler, **(crawlers or {})}
+        self.source_names = source_names
+
+    def _in_scope(self, source_name: str) -> bool:
+        return self.source_names is None or source_name in self.source_names
 
     async def refresh_due(self, limit: int = 3) -> WatchlistRefreshSummary:
         if not 1 <= limit <= 10:
@@ -44,7 +49,10 @@ class WatchlistMonitor:
         due = [
             target
             for target in list_watch_targets(self.session_factory)
-            if target.enabled and target.refresh_due and target.source_url is not None
+            if target.enabled
+            and target.refresh_due
+            and target.source_url is not None
+            and self._in_scope(target.source_name)
         ][:limit]
         items = []
         stopped = False

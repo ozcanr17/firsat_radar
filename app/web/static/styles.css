@@ -2820,3 +2820,45 @@ dd {
         grid-template-columns: 1fr;
     }
 }
+
+.connector-runtime {
+    border-left: 3px solid var(--muted, #94a3b8);
+    padding-left: 13px;
+    display: grid;
+    gap: 3px;
+}
+
+.connector-runtime strong {
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+}
+
+.connector-runtime p {
+    font-size: 0.78rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.connector-runtime span {
+    font-size: 0.66rem;
+    opacity: 0.75;
+}
+
+.connector-runtime.runtime-completed {
+    border-left-color: #22c55e;
+}
+
+.connector-runtime.runtime-running {
+    border-left-color: #38bdf8;
+}
+
+.connector-runtime.runtime-throttled {
+    border-left-color: #f59e0b;
+}
+
+.connector-runtime.runtime-failed,
+.connector-runtime.runtime-circuit_open {
+    border-left-color: #ef4444;
+}

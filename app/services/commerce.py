@@ -9,6 +9,7 @@ from app.db.models import BusinessCase, Product, WatchTarget
 from app.db.session import SessionFactory
 from app.services.marketplaces import MARKETPLACE_BY_KEY
 from app.services.products import ProductView, list_latest_products
+from app.sources.akakce.parser import extract_external_id as extract_akakce_id
 from app.sources.amazon_tr.parser import extract_asin
 from app.sources.hepsiburada.parser import extract_external_id
 
@@ -156,6 +157,13 @@ def add_watch_target(
         and source_name == "amazon_tr"
         and source_url is not None
         and extract_asin(source_url) is None
+    ):
+        raise ValueError("invalid_product_url")
+    if (
+        target_type == "product"
+        and source_name == "akakce"
+        and source_url is not None
+        and extract_akakce_id(source_url) is None
     ):
         raise ValueError("invalid_product_url")
     category = target.category.strip() if target.category else None

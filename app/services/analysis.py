@@ -1,5 +1,6 @@
 import json
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -10,6 +11,7 @@ from app.db.models import (
     Analysis as AnalysisModel,
 )
 from app.db.models import (
+    Offer,
     Opportunity,
     Product,
     ProductDetail,
@@ -24,6 +26,31 @@ from app.domain.analysis import AnalysisSummary, ProductAnalysisInput, ReviewSig
 class AnalysisService:
     def __init__(self, session_factory: SessionFactory) -> None:
         self.session_factory = session_factory
+
+    @staticmethod
+    def _latest_offers(
+        session: Session,
+        product_id: int,
+    ) -> tuple[tuple[Decimal, ...], tuple[str, ...]]:
+        latest_observed_at = session.scalar(
+            select(Offer.observed_at)
+            .where(Offer.product_id == product_id)
+            .order_by(Offer.observed_at.desc(), Offer.id.desc())
+            .limit(1)
+        )
+        if latest_observed_at is None:
+            return (), ()
+        offers = session.scalars(
+            select(Offer).where(
+                Offer.product_id == product_id,
+                Offer.observed_at == latest_observed_at,
+            )
+        ).all()
+        prices = tuple(offer.price for offer in offers if offer.price is not None)
+        marketplaces = tuple(
+            sorted({offer.marketplace for offer in offers if offer.marketplace is not None})
+        )
+        return prices, marketplaces
 
     def analyze(self, limit: int = 200) -> AnalysisSummary:
         if not 1 <= limit <= 500:
@@ -63,6 +90,7 @@ class AnalysisService:
                     .order_by(ProductDetail.observed_at.desc(), ProductDetail.id.desc())
                     .limit(1)
                 )
+                offer_prices, marketplaces = self._latest_offers(session, product.id)
                 reviews = session.scalars(
                     select(Review).where(Review.product_id == product.id).order_by(Review.id)
                 ).all()
@@ -88,6 +116,9 @@ class AnalysisService:
                         detail_confidence=detail_confidence,
                         stored_review_count=len(reviews),
                         negative_review_count=negative_reviews,
+                        offer_prices=offer_prices,
+                        marketplaces=marketplaces,
+                        seller_count=current.seller_count,
                     )
                 )
             review_population = [
@@ -120,6 +151,7 @@ class AnalysisService:
                     pain=metrics.pain,
                     momentum=metrics.momentum,
                     price_position=metrics.price_position,
+                    price_spread=metrics.spread,
                     confidence=metrics.confidence,
                     coverage=metrics.coverage,
                     model_version=MODEL_VERSION,

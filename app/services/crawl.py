@@ -334,6 +334,7 @@ class CrawlService:
                             rating=stub.rating,
                             review_count=stub.review_count,
                             rank=stub.rank,
+                            seller_count=stub.seller_count,
                             coverage=stub.coverage,
                             confidence=stub.confidence,
                         )
@@ -385,15 +386,7 @@ class CrawlService:
                     )
                 )
                 details_created += 1
-                if detail.seller:
-                    session.add(
-                        Offer(
-                            product_id=product.id,
-                            fetch_id=detail_fetch.id,
-                            observed_at=detail.detail_document.fetched_at,
-                            seller=detail.seller,
-                        )
-                    )
+                self._persist_offers(session, product.id, detail_fetch.id, detail)
                 if detail.review_document is None:
                     continue
                 review_fetch = self._persist_document_fetch(
@@ -448,6 +441,42 @@ class CrawlService:
                 reviews_created=reviews_created,
                 fetches_created=self._fetch_count(session, run_id),
                 listing_signature=listing_signature,
+            )
+
+    @staticmethod
+    def _persist_offers(
+        session: Session,
+        product_id: int,
+        fetch_id: int,
+        detail: ProductDetailResult,
+    ) -> None:
+        observed_at = detail.detail_document.fetched_at
+        if not detail.offers:
+            if detail.seller:
+                session.add(
+                    Offer(
+                        product_id=product_id,
+                        fetch_id=fetch_id,
+                        observed_at=observed_at,
+                        seller=detail.seller,
+                    )
+                )
+            return
+        for offer in detail.offers:
+            session.add(
+                Offer(
+                    product_id=product_id,
+                    fetch_id=fetch_id,
+                    observed_at=observed_at,
+                    marketplace=offer.marketplace,
+                    seller=offer.seller,
+                    price=offer.price,
+                    currency=offer.currency,
+                    availability=offer.availability,
+                    offer_url=offer.offer_url,
+                    stock_text=offer.stock_text,
+                    delivery_text=offer.delivery_text,
+                )
             )
 
     def _persist_document_fetch(
@@ -535,6 +564,13 @@ class CrawlService:
                         else None
                     ),
                     rank=1,
+                    seller_count=(
+                        detail.seller_count
+                        if detail.seller_count is not None
+                        else fallback.seller_count
+                        if fallback
+                        else None
+                    ),
                     coverage=detail.coverage,
                     confidence=detail.confidence,
                 )
@@ -555,15 +591,7 @@ class CrawlService:
                     reason_codes_json=json.dumps(detail.reason_codes, ensure_ascii=False),
                 )
             )
-            if detail.seller:
-                session.add(
-                    Offer(
-                        product_id=product.id,
-                        fetch_id=detail_fetch.id,
-                        observed_at=detail.detail_document.fetched_at,
-                        seller=detail.seller,
-                    )
-                )
+            self._persist_offers(session, product.id, detail_fetch.id, detail)
             reviews_created = 0
             if detail.review_document is not None:
                 review_fetch = self._persist_document_fetch(

@@ -17,6 +17,19 @@ class Settings(BaseSettings):
     database_url: str | None = None
     timezone: str = "Europe/Istanbul"
     hepsiburada_start_url: str = "https://www.hepsiburada.com/anne-bebek-oyuncak-c-2147483639"
+    hepsiburada_enabled: bool = False
+    akakce_enabled: bool = True
+    akakce_start_url: str = "https://www.akakce.com/cep-telefonu.html"
+    akakce_min_request_seconds: float = Field(default=25.0, ge=10.0, le=120.0)
+    akakce_max_request_seconds: float = Field(default=45.0, ge=10.0, le=180.0)
+    akakce_rate_limit_cooldown_minutes: int = Field(default=30, ge=5, le=360)
+    akakce_daily_request_limit: int = Field(default=400, ge=10, le=2000)
+    vatan_enabled: bool = True
+    vatan_start_url: str = "https://www.vatanbilgisayar.com/notebook/"
+    vatan_min_request_seconds: float = Field(default=15.0, ge=5.0, le=120.0)
+    vatan_max_request_seconds: float = Field(default=25.0, ge=5.0, le=180.0)
+    vatan_rate_limit_cooldown_minutes: int = Field(default=20, ge=5, le=360)
+    vatan_daily_request_limit: int = Field(default=500, ge=10, le=2000)
     browser_channel: str | None = "chrome"
     browser_headless: bool = False
     browser_navigation_timeout_seconds: int = Field(default=20, ge=5, le=60)

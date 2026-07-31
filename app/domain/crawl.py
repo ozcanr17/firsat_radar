@@ -67,6 +67,19 @@ class ProductStub:
     delivery_text: str | None
     coverage: float
     confidence: float
+    seller_count: int | None = None
+
+
+@dataclass(frozen=True)
+class MerchantOffer:
+    marketplace: str
+    seller: str | None
+    price: Decimal | None
+    currency: str
+    availability: str | None
+    offer_url: str | None
+    delivery_text: str | None = None
+    stock_text: str | None = None
 
 
 @dataclass(frozen=True)
@@ -134,6 +147,8 @@ class ProductDetailResult:
     rating: float | None = None
     review_count: int | None = None
     image_url: str | None = None
+    seller_count: int | None = None
+    offers: tuple[MerchantOffer, ...] = ()
 
 
 @dataclass(frozen=True)

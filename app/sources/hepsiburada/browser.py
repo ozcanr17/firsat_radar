@@ -1,10 +1,6 @@
-import asyncio
 import hashlib
-import json
-import random
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
-from pathlib import Path
 from types import TracebackType
 from typing import Any, Self, cast
 
@@ -38,6 +34,7 @@ from app.sources.hepsiburada.parser import (
     parse_category_links,
 )
 from app.sources.hepsiburada.policy import RobotsPolicy
+from app.sources.throttle import DailyRequestQuota, DomainRateLimiter
 
 BASE_URL = "https://www.hepsiburada.com"
 ROBOTS_URL = f"{BASE_URL}/robots.txt"
@@ -45,7 +42,6 @@ PARSER_VERSION = "hepsiburada-listing-browser-v1"
 DETAIL_PARSER_VERSION = "hepsiburada-detail-browser-v1"
 REVIEW_PARSER_VERSION = "hepsiburada-review-browser-v1"
 USER_AGENT = "PazarRadar/1.4 (+https://github.com/ozcanr17/firsat_radar)"
-DAILY_REQUEST_LIMIT = 800
 PRODUCT_CARD_SELECTOR = "main article"
 PRODUCT_LINK_SELECTOR = "a[href*='-p-'], a[href*='-pm-']"
 
@@ -441,50 +437,6 @@ class HepsiburadaBrowserAdapter:
                 "access denied",
                 "captcha",
             )
-        )
-
-
-class DomainRateLimiter:
-    def __init__(self, state_path: Path, minimum_seconds: float, maximum_seconds: float) -> None:
-        self.state_path = state_path
-        self.minimum_seconds = minimum_seconds
-        self.maximum_seconds = maximum_seconds
-
-    async def wait(self) -> None:
-        if not self.state_path.exists():
-            return
-        try:
-            last_request_at = datetime.fromisoformat(self.state_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return
-        interval = random.uniform(self.minimum_seconds, self.maximum_seconds)
-        elapsed = (datetime.now(UTC) - last_request_at).total_seconds()
-        if elapsed < interval:
-            await asyncio.sleep(interval - elapsed)
-
-    def mark(self) -> None:
-        self.state_path.write_text(datetime.now(UTC).isoformat(), encoding="utf-8")
-
-
-class DailyRequestQuota:
-    def __init__(self, state_path: Path) -> None:
-        self.state_path = state_path
-
-    def consume(self) -> None:
-        today = datetime.now(UTC).date().isoformat()
-        count = 0
-        if self.state_path.exists():
-            try:
-                payload = json.loads(self.state_path.read_text(encoding="utf-8"))
-                if payload.get("date") == today:
-                    count = int(payload.get("count", 0))
-            except (json.JSONDecodeError, OSError, TypeError, ValueError):
-                count = 0
-        if count >= DAILY_REQUEST_LIMIT:
-            raise SourceAccessError(RunStatus.FAILED, "daily_quota_reached")
-        self.state_path.write_text(
-            json.dumps({"date": today, "count": count + 1}),
-            encoding="utf-8",
         )
 
 

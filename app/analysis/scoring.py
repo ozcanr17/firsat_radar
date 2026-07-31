@@ -3,14 +3,16 @@ from decimal import Decimal
 
 from app.domain.analysis import MetricSet, OpportunityResult, ProductAnalysisInput
 
-MODEL_VERSION = "rules-tr-v2"
+MODEL_VERSION = "rules-tr-v3"
 WEIGHTS = {
-    "demand": 0.25,
-    "satisfaction": 0.20,
-    "pain": 0.25,
-    "momentum": 0.15,
-    "price_position": 0.15,
+    "demand": 0.20,
+    "satisfaction": 0.16,
+    "pain": 0.20,
+    "momentum": 0.12,
+    "price_position": 0.12,
+    "spread": 0.20,
 }
+MIN_ARBITRAGE_SPREAD = 12.0
 
 
 def calculate_metrics(
@@ -34,7 +36,10 @@ def calculate_metrics(
     price_position = (
         100.0 - percentile(float(item.price), price_population) if item.price is not None else None
     )
-    values = (demand, satisfaction, pain, momentum, price_position)
+    spread = calculate_spread(item.offer_prices)
+    values = [demand, satisfaction, pain, momentum, price_position]
+    if len(item.offer_prices) >= 2:
+        values.append(spread)
     coverage = sum(value is not None for value in values) / len(values)
     detail_quality = item.detail_confidence or 0.0
     review_quality = min(item.stored_review_count / 10.0, 1.0)
@@ -48,7 +53,19 @@ def calculate_metrics(
         price_position=round_optional(price_position),
         coverage=round(coverage, 4),
         confidence=round(confidence, 4),
+        spread=round_optional(spread),
     )
+
+
+def calculate_spread(offer_prices: Sequence[Decimal]) -> float | None:
+    prices = [float(price) for price in offer_prices if price > 0]
+    if len(prices) < 2:
+        return None
+    highest = max(prices)
+    lowest = min(prices)
+    if highest <= 0:
+        return None
+    return clamp((highest - lowest) / highest * 100.0)
 
 
 def score_opportunity(
@@ -62,6 +79,7 @@ def score_opportunity(
         "pain": metrics.pain,
         "momentum": metrics.momentum,
         "price_position": metrics.price_position,
+        "spread": metrics.spread,
     }
     available_weight = sum(WEIGHTS[name] for name, value in values.items() if value is not None)
     raw_score = (
@@ -122,6 +140,8 @@ def calculate_momentum(
 
 
 def resolve_pattern(metrics: MetricSet) -> str:
+    if at_least(metrics.spread, MIN_ARBITRAGE_SPREAD):
+        return "price_arbitrage"
     if at_least(metrics.demand, 60.0) and at_least(metrics.pain, 30.0):
         return "validated_pain"
     if at_least(metrics.satisfaction, 80.0) and at_least(metrics.demand, 50.0):
@@ -149,6 +169,12 @@ def build_reasons(
             "previous_price": str(item.previous_price) if item.previous_price is not None else None,
         },
         "price_position": {"price": str(item.price) if item.price is not None else None},
+        "spread": {
+            "lowest_offer": str(item.lowest_offer) if item.lowest_offer is not None else None,
+            "highest_offer": str(item.highest_offer) if item.highest_offer is not None else None,
+            "offer_count": len(item.offer_prices),
+            "marketplaces": list(item.marketplaces),
+        },
     }
     values = {
         "demand": metrics.demand,
@@ -156,6 +182,7 @@ def build_reasons(
         "pain": metrics.pain,
         "momentum": metrics.momentum,
         "price_position": metrics.price_position,
+        "spread": metrics.spread,
     }
     return tuple(
         {"metric": name, "score": value, "evidence": facts[name]}
@@ -178,6 +205,10 @@ def build_risks(
         risks.append("momentum_unavailable")
     if market_size < 5:
         risks.append("small_market_sample")
+    if metrics.spread is None:
+        risks.append("single_offer_no_spread")
+    elif len(item.marketplaces) < 2:
+        risks.append("spread_within_single_marketplace")
     return tuple(risks)
 
 
@@ -186,6 +217,10 @@ def hypothesis_for(pattern: str) -> str:
         "validated_pain": "Talep doğrulanmış; tekrarlanan sorunlar iyileştirme alanı gösterebilir.",
         "validated_demand": "Talep ve memnuniyet birlikte güçlü görünüyor.",
         "price_advantage": "Kategori içi fiyat konumu rekabet avantajı sağlayabilir.",
+        "price_arbitrage": (
+            "Aynı ürün satıcılar arasında belirgin fiyat farkıyla listeleniyor; "
+            "ucuz kaynaktan tedarik marjı test edilebilir."
+        ),
         "early_momentum": "Son snapshot değişimleri erken ivme sinyali veriyor.",
         "watch": "Mevcut kanıt güçlü bir fırsat deseni için henüz yeterli değil.",
     }[pattern]

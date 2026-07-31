@@ -22,6 +22,7 @@ EXPECTED_TABLES = {
     "reviews",
     "runtime_state",
     "settings",
+    "source_runtime_state",
     "sources",
     "watch_targets",
 }
