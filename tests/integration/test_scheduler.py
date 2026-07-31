@@ -19,9 +19,11 @@ class FakeCrawler:
     def __init__(self, outcomes: list[CrawlSummary | Exception]) -> None:
         self.outcomes = outcomes
         self.calls = 0
+        self.limits: list[CrawlLimits] = []
 
     async def crawl(self, limits: CrawlLimits) -> CrawlSummary:
         self.calls += 1
+        self.limits.append(limits)
         outcome = self.outcomes.pop(0)
         if isinstance(outcome, Exception):
             raise outcome
@@ -231,6 +233,45 @@ async def test_pipeline_runs_watchlist_and_catalog_in_same_cycle(settings: Setti
     assert catalog.page_counts == [settings.catalog_pages_per_run]
     assert crawler.calls == 0
     assert analyzer.calls == 1
+    engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_pipeline_bounds_fallback_discovery_limit(settings: Settings) -> None:
+    settings = Settings(
+        environment="test",
+        data_dir=settings.data_dir,
+        catalog_enabled=False,
+        scheduler_products=200,
+        crawl_max_products=60,
+    )
+    crawler = FakeCrawler([crawl_summary(RunStatus.COMPLETED)])
+    watchlist = FakeCatalog(
+        CrawlSummary(
+            run_id=0,
+            status=RunStatus.UNCHANGED,
+            products_seen=0,
+            products_created=0,
+            products_updated=0,
+            snapshots_created=0,
+            details_created=0,
+            reviews_created=0,
+            fetches_created=0,
+            error_code=None,
+            listing_signature=None,
+        )
+    )
+    pipeline, _, _, _, _, _, engine = build_pipeline(
+        settings,
+        crawler,
+        watchlist=watchlist,
+    )
+
+    result = await pipeline.run()
+
+    assert result.status == "completed"
+    assert crawler.calls == 1
+    assert crawler.limits[0].products == 60
     engine.dispose()
 
 

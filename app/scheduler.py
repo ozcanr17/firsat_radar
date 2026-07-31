@@ -247,7 +247,11 @@ class ScheduledPipeline:
 
     async def _crawl_with_retry(self) -> tuple[CrawlSummary, int]:
         limits = CrawlLimits(
-            products=self.settings.scheduler_products,
+            products=min(
+                self.settings.scheduler_products,
+                self.settings.crawl_max_products,
+                60,
+            ),
             details=self.settings.scheduler_details,
         )
         for attempt in range(1, self.settings.retry_attempts + 1):

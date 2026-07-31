@@ -19,6 +19,7 @@ Release: 1.6.0
 - Enabled the 17-category round-robin catalog by default.
 - Changed the scheduler to start immediately and then repeat hourly.
 - Changed each cycle to process both due watch targets and category discovery.
+- Bounded the fallback discovery request to the collector's 60-product safety limit.
 - Added direct discovery for unresolved Hepsiburada product URLs.
 - Linked newly discovered products back to their watch targets.
 - Added bounded category target discovery.
@@ -54,12 +55,13 @@ The unified control page is `https://firsatradar-production.up.railway.app/`. De
 - Ruff lint passed.
 - Ruff format passed.
 - Mypy strict mode passed.
-- Pytest passed: 52 tests.
+- Pytest passed: 53 tests.
 - Desktop Radar Center layout was visually verified in the in-app browser.
 - Mobile Radar Center layout was visually verified at 390 × 844.
 - Product URL discovery and watch-target linking are covered by integration tests.
 - Watchlist and catalog execution in the same scheduler cycle are covered by integration tests.
 - Radar status and category management APIs are covered by integration tests.
+- Railway accepted release `1.6.0`, but Hepsiburada returned a security page for `robots.txt` from the Railway egress IP during the first live catalog probe. The collector stopped without bypassing it.
 
 ## Delivery
 
