@@ -4,7 +4,7 @@ Firsat Radar is a local-first product opportunity research application planned a
 
 ## Current status
 
-Stage 6 is complete. The application provides the responsive research panel plus non-overlapping scheduling, bounded retry, circuit breaking, verified SQLite backups, raw-evidence retention, and persistent operational state.
+Stage 7 is complete. The application provides a responsive research panel, traceable live-data collection, evidence-based analysis, non-overlapping scheduling, verified backups, and operational safeguards.
 
 See [ADR 0002](docs/adr/0002-browser-data-access.md) and [HANDOFF.md](HANDOFF.md) for evidence and next steps.
 
@@ -39,13 +39,15 @@ Check the current policy and run a limited live crawl:
 
 The browser runs visibly, uses one tab, and stops on an access block or CAPTCHA. Each requested detail includes only its first public rendered review page. Reviewer identity is discarded before persistence, and direct contact identifiers in review text are redacted.
 
-Start the local application:
+Start the local application and open the panel with one command:
 
 ```bash
-.venv/bin/python -m app.cli serve
+.venv/bin/python -m app.cli open-panel
 ```
 
-Open `http://127.0.0.1:8000`. Do not open `app/web/templates/index.html` directly: Jinja templates and static assets are rendered only through the running FastAPI application. The health endpoint is available at `http://127.0.0.1:8000/healthz`.
+The command upgrades the local database, starts the service, and opens `http://127.0.0.1:8000`. Opening `app/web/templates/index.html` directly now shows a static launcher instead of unrendered template syntax. The health endpoint is available at `http://127.0.0.1:8000/healthz`.
+
+For server-only operation, use `.venv/bin/python -m app.cli serve`.
 
 The live APIs are available at `http://127.0.0.1:8000/api/v1/products` and `http://127.0.0.1:8000/api/v1/opportunities`. Opportunity results include metric evidence, coverage, confidence, risks, and an explicitly validation-required hypothesis.
 

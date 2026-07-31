@@ -1,5 +1,7 @@
 import asyncio
 import json
+import threading
+import webbrowser
 from dataclasses import asdict
 from datetime import UTC, datetime
 
@@ -247,11 +249,29 @@ def serve(
     port: int | None = typer.Option(None),
 ) -> None:
     settings = Settings()
+    upgrade_database(settings)
     uvicorn.run(
         "app.main:app",
         host=host or settings.host,
         port=port or settings.port,
         reload=settings.environment == "development",
+    )
+
+
+@app.command("open-panel")
+def open_panel() -> None:
+    settings = Settings()
+    upgrade_database(settings)
+    browser_host = "127.0.0.1" if settings.host in {"0.0.0.0", "::"} else settings.host
+    panel_url = f"http://{browser_host}:{settings.port}"
+    opener = threading.Timer(1.0, webbrowser.open, args=(panel_url,))
+    opener.daemon = True
+    opener.start()
+    uvicorn.run(
+        "app.main:app",
+        host=settings.host,
+        port=settings.port,
+        reload=False,
     )
 
 

@@ -44,6 +44,6 @@ Add non-overlapping scheduling, retries, circuit breaker, retention, backups, an
 
 ## Stage 7: Acceptance and delivery
 
-Status: Ready.
+Status: Complete.
 
 Run the opt-in live smoke test, full quality checks, UI verification, and final documentation.

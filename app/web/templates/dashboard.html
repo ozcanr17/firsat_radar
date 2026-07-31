@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Genel Bakış · {{ app_name }}{% endblock %}
+
+{% block topbar_actions %}
+<a class="button secondary compact" href="{{ url_for('products_export') }}">Ürün CSV</a>
+{% endblock %}
+
+{% block content %}
+<section class="page-heading dashboard-heading">
+    <div>
+        <span class="section-tag">{{ data_state }}</span>
+        <h1>Pazardaki sinyali<br><em>gürültüden ayır.</em></h1>
+        <p>Gerçek ürün, fiyat ve yorum verisini tek bir kanıt akışında incele.</p>
+    </div>
+    <div class="heading-orbit" aria-hidden="true">
+        <span class="orbit-score">{{ "%.0f"|format(opportunities[0].score) if opportunities else "—" }}</span>
+        <small>lider fırsat puanı</small>
+    </div>
+</section>
+
+<section class="stat-grid" aria-label="Sistem özeti">
+    <article class="stat-card accent-orange">
+        <span class="stat-icon">◫</span>
+        <div><strong>{{ stats.product_count }}</strong><span>Canlı ürün</span></div>
+        <small>İzlenebilir snapshot</small>
+    </article>
+    <article class="stat-card accent-blue">
+        <span class="stat-icon">≋</span>
+        <div><strong>{{ stats.review_count }}</strong><span>Kayıtlı yorum</span></div>
+        <small>Kimlik minimizasyonlu</small>
+    </article>
+    <article class="stat-card accent-violet">
+        <span class="stat-icon">↗</span>
+        <div><strong>{{ stats.opportunity_count }}</strong><span>Fırsat analizi</span></div>
+        <small>Kanıt ve risk birlikte</small>
+    </article>
+    <article class="stat-card accent-green">
+        <span class="stat-icon">◷</span>
+        <div><strong>{{ stats.run_count }}</strong><span>Tarama çalışması</span></div>
+        <small>{{ status_labels.get(stats.last_run_status, stats.last_run_status or 'Henüz yok') }}</small>
+    </article>
+</section>
+
+<section class="section-block">
+    <div class="section-heading">
+        <div><span class="section-index">01</span><h2>Öne çıkan fırsatlar</h2></div>
+        <a class="text-link" href="{{ url_for('opportunities_page') }}">Tümünü incele <span>→</span></a>
+    </div>
+    {% if opportunities %}
+    <div class="opportunity-grid">
+        {% for opportunity in opportunities[:3] %}
+        <a class="opportunity-card" href="{{ url_for('product_page', product_id=opportunity.product_id) }}">
+            <div class="opportunity-topline">
+                <span class="pattern-badge pattern-{{ opportunity.pattern }}">{{ pattern_labels.get(opportunity.pattern, opportunity.pattern or 'İzle') }}</span>
+                <span class="confidence">%{{ "%.0f"|format(opportunity.confidence * 100) }} güven</span>
+            </div>
+            <h3>{{ opportunity.title }}</h3>
+            <div class="score-row">
+                <strong>{{ "%.1f"|format(opportunity.score) }}</strong>
+                <div class="score-track"><span style="--value: {{ opportunity.score }}%"></span></div>
+            </div>
+            <p>{{ opportunity.hypothesis.get('summary', '') }}</p>
+            <div class="card-footer"><span>{{ opportunity.reasons|length }} kanıt</span><span>{{ opportunity.risks|length }} risk</span><b>Detay →</b></div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-panel"><span>↗</span><h3>Henüz analiz yok</h3><p>Canlı veri toplandıktan sonra analiz komutunu çalıştır.</p></div>
+    {% endif %}
+</section>
+
+<section class="section-block">
+    <div class="section-heading">
+        <div><span class="section-index">02</span><h2>Son ürün gözlemleri</h2></div>
+        <a class="text-link" href="{{ url_for('products_page') }}">Ürün kataloğu <span>→</span></a>
+    </div>
+    {% if products %}
+    <div class="data-card">
+        <div class="responsive-table">
+            <table>
+                <thead><tr><th>Ürün</th><th>Fiyat</th><th>Puan</th><th>Yorum</th><th>Fırsat</th><th></th></tr></thead>
+                <tbody>
+                {% for product in products %}
+                    <tr>
+                        <td>
+                            <a class="product-cell" href="{{ url_for('product_page', product_id=product.id) }}">
+                                <span class="product-thumb">{% if product.image_url %}<img src="{{ product.image_url }}" alt="">{% else %}◫{% endif %}</span>
+                                <span><strong>{{ product.title }}</strong><small>{{ product.brand or 'Marka belirtilmedi' }}</small></span>
+                            </a>
+                        </td>
+                        <td><strong>{{ "{:,.2f}".format(product.price).replace(',', 'X').replace('.', ',').replace('X', '.') if product.price is not none else '—' }}</strong><small class="unit"> TL</small></td>
+                        <td><span class="rating-chip">★ {{ product.rating if product.rating is not none else '—' }}</span></td>
+                        <td>{{ product.review_count if product.review_count is not none else '—' }}</td>
+                        <td>{% if product.opportunity_score is not none %}<span class="table-score">{{ "%.1f"|format(product.opportunity_score) }}</span>{% else %}—{% endif %}</td>
+                        <td><a class="row-action" href="{{ url_for('product_page', product_id=product.id) }}">→</a></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-panel"><span>◫</span><h3>Henüz canlı ürün yok</h3><p>Panel örnek veya sahte pazar verisi göstermez.</p></div>
+    {% endif %}
+</section>
+{% endblock %}

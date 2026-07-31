@@ -98,7 +98,7 @@ def create_web_router(settings: Settings, session_factory: SessionFactory) -> AP
                 "opportunities": opportunities,
             }
         )
-        return templates.TemplateResponse(request=request, name="index.html", context=context)
+        return templates.TemplateResponse(request=request, name="dashboard.html", context=context)
 
     @router.get("/products", response_class=HTMLResponse, name="products_page")
     def products_page(request: Request) -> HTMLResponse:

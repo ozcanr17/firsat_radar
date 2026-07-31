@@ -2,96 +2,85 @@
 
 ## Current stage
 
-Stage 6: Scheduling and hardening
+Stage 7: Acceptance and delivery
 
 Status: Complete
 
-## Completed
+Release: 1.0.0
 
-- Added a separate APScheduler process with configurable 12-hour intervals.
-- Added APScheduler `max_instances=1`, coalescing, and misfire protection.
-- Added an operating-system file lock for non-overlap across scheduler processes.
-- Added bounded exponential retry for unexpected transient exceptions only.
-- Kept access blocks, policy denials, parser drift, HTTP 403, HTTP 429, and CAPTCHA states non-retryable.
-- Added immediate circuit opening for access blocks, policy denials, and parser drift.
-- Added threshold-based circuit opening for other consecutive failures.
-- Added persistent scheduler, failure, circuit, backup, and retention state.
-- Added online SQLite backup with `PRAGMA integrity_check` verification.
-- Added bounded backup retention under `data/backups`.
-- Added seven-day compressed raw-evidence retention restricted to `data/raw/*.gz`.
-- Added dry-run by default for manual raw-evidence cleanup.
-- Added migration `20260731_0005` for runtime state.
-- Extended `/healthz` with scheduler and circuit state.
-- Added scheduler state, failure count, circuit expiry, backup, and retention fields to the Settings panel.
-- Added `backup`, `prune-raw`, `runtime-status`, `circuit-reset`, `scheduled-run`, and `schedule` CLI commands.
-- Added operational and recovery documentation in `docs/operations.md`.
+## Delivered
+
+- Added a polished responsive dashboard with products, opportunities, product evidence, run history, settings, JSON APIs, and CSV exports.
+- Separated the server-rendered dashboard from the directly opened `index.html` file.
+- Replaced the raw Jinja direct-file experience with a polished static panel launcher.
+- Added `open-panel` to upgrade the database, start the service, and open the correct local URL.
+- Made `serve` apply pending migrations before accepting requests.
+- Preserved traceable live data, coverage, confidence, source URLs, fetch provenance, and review-identity minimization.
+- Preserved robots gating, sequential single-tab navigation, bounded requests, access-block stops, scheduling locks, circuit breaking, verified backups, and raw-evidence retention.
+
+## Start
+
+```bash
+.venv/bin/python -m app.cli open-panel
+```
+
+The panel opens at `http://127.0.0.1:8000`.
+
+## Final acceptance
+
+- Desktop panel visually verified through the running HTTP application.
+- Direct `index.html` statically verified to contain no Jinja expressions or statements.
+- Dashboard, products, product detail, opportunities, runs, settings, health, both JSON APIs, and both CSV exports returned HTTP 200.
+- Clean Python 3.12 environment installed from `requirements.lock`.
+- Clean database migrated through revisions `20260731_0001` to `20260731_0005`.
+- Clean-environment doctor and dependency checks passed.
+- Ruff lint passed.
+- Ruff format check passed.
+- Mypy strict mode passed.
+- Pytest passed: 33 tests.
+- Repository audit passed: no tracked runtime data, caches, environment files, secrets, demo market data, fabricated market data, or code comments.
+- Git whitespace validation passed.
+
+## Live smoke test
+
+- Policy state: `allowed`
+- Policy response: HTTP 200
+- Crawl limit: 1 product
+- Detail limit: 0
+- Run status: `completed`
+- Products seen: 1
+- Existing products updated: 1
+- Snapshots created: 1
+- Detail or review requests: 0
+- Access blocks or CAPTCHA: none
 
 ## Safety contract
 
-- Browser navigation remains single-tab and sequential.
-- Cross-process scheduled overlap performs zero crawl work.
-- Open circuit performs zero backup, navigation, crawl, analysis, or retention work.
-- Security blocks are never retried.
-- Manual retention defaults to preview mode.
-- Automated deletion only targets expired `*.gz` files inside the configured raw directory.
-- A verified database backup is created before each scheduled crawl.
-- Circuit reset is manual and documented for investigated recovery only.
-
-## Local acceptance
-
-- Runtime migration: `20260731_0005`
-- Manual SQLite backup: created
-- Backup size: 122880 bytes
-- Backup integrity: `ok`
-- Raw files scanned: 9
-- Raw files eligible after seven days: 0
-- Raw files deleted from live data: 0
-- Scheduler state: `idle`
-- Consecutive failures: 0
-- Circuit open: no
-- Live market requests during Stage 6 acceptance: 0
-
-## Failure and recovery verification
-
-- Unexpected transient exception retried once and succeeded on attempt two.
-- Retry delay remained bounded and deterministic in tests.
-- Security block opened the circuit immediately.
-- A second job under open circuit performed zero crawl calls.
-- Cross-process lock rejected an overlapping job.
-- Successful job reset failure count and circuit state.
-- Manual circuit reset cleared the persisted breaker state.
-- Backup retention removed only backups beyond the configured newest count.
-- Raw retention dry-run reported candidates without deletion.
-- Raw retention apply removed only an expired test fixture.
-
-## Verification
-
-- Ruff lint: passed
-- Ruff format check: passed
-- Mypy strict mode: passed
-- Pytest: 31 passed
-- Pip dependency check: passed
-- Clean migration chain: passed
-- No Python code comments: passed
+- Runtime market data remains ignored under `data/` and is not committed.
+- The application contains no seed, demo, or fabricated market data.
+- Public rendered pages are accessed visibly, sequentially, and through one tab.
+- Crawls stop on robots denial, HTTP 403, HTTP 429, CAPTCHA, or parser drift.
+- No access bypass, proxy rotation, hidden API, `/api/`, or `/product-comment/` collection is used.
+- Reviewer identity is discarded and direct contact identifiers are redacted before persistence.
+- Opportunity output remains a validation-required hypothesis backed by evidence, coverage, confidence, and risks.
 
 ## Operational commands
 
 ```bash
+.venv/bin/python -m app.cli doctor
+.venv/bin/python -m app.cli policy-check --source hepsiburada
+.venv/bin/python -m app.cli crawl --source hepsiburada --limit-products 20
+.venv/bin/python -m app.cli analyze --limit-products 60
 .venv/bin/python -m app.cli backup
 .venv/bin/python -m app.cli prune-raw --dry-run
 .venv/bin/python -m app.cli runtime-status
 .venv/bin/python -m app.cli scheduled-run
 .venv/bin/python -m app.cli schedule
-.venv/bin/python -m app.cli circuit-reset
 ```
 
 ## Known limits
 
-- The scheduler is a separate foreground process and is not installed as a macOS launch agent.
-- SQLite recovery is documented but intentionally not automated over the active database.
-- Circuit reset remains a manual operator decision.
-- Remote deployment, authentication, and alert delivery remain out of scope.
-
-## Next stage
-
-Stage 7 is ready: run final acceptance, verify installation from a clean environment, confirm all UI and operational paths, audit repository contents, and produce the final delivery handoff.
+- The application is local-first and has no remote deployment or authentication layer.
+- The scheduler remains a separate foreground process rather than a macOS launch agent.
+- Source markup changes can require parser maintenance and intentionally stop collection.
+- Marketplace terms and robots policy must be rechecked before expanding collection scope.
