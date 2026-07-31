@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     catalog_pages_per_run: int = Field(default=3, ge=1, le=10)
     catalog_products_per_page: int = Field(default=60, ge=1, le=60)
     catalog_details_per_page: int = Field(default=2, ge=0, le=5)
+    category_discovery_links_per_page: int = Field(default=40, ge=1, le=100)
+    category_discovery_max_depth: int = Field(default=6, ge=1, le=10)
     retry_attempts: int = Field(default=2, ge=1, le=3)
     retry_delay_seconds: float = Field(default=30.0, ge=5.0, le=300.0)
     circuit_failure_threshold: int = Field(default=3, ge=1, le=5)

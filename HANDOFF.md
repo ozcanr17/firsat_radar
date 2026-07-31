@@ -33,7 +33,7 @@ Release: 1.7.0
 - Added Amazon ASIN validation for product targets.
 - Added a source-aware crawler registry to the watchlist monitor.
 - Added a generic category-link result contract shared by source adapters.
-- Added bounded child-category discovery with URL deduplication, 12 children per page, and a three-level depth limit.
+- Added bounded child-category discovery with URL deduplication, 40 children per page, and a configurable six-level depth limit.
 - Added Hepsiburada child-category extraction for permitted category pages.
 - Kept Amazon targets registered but paused until Creators API credentials or written automation permission is connected.
 

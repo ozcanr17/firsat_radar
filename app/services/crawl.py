@@ -665,9 +665,9 @@ class CrawlService:
         listing: ListingResult,
         category_name: str,
     ) -> None:
-        if category_name.count(" > ") >= 2:
+        if category_name.count(" > ") >= self.settings.category_discovery_max_depth - 1:
             return
-        for link in listing.category_links[:12]:
+        for link in listing.category_links[: self.settings.category_discovery_links_per_page]:
             existing = session.scalar(select(WatchTarget).where(WatchTarget.source_url == link.url))
             if existing is not None:
                 continue

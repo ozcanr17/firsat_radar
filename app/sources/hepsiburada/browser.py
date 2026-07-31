@@ -186,6 +186,7 @@ class HepsiburadaBrowserAdapter:
             ],
             BASE_URL,
             page.url,
+            self.settings.category_discovery_links_per_page,
         )
         if cards:
             products, coverage = parse_cards(cards, BASE_URL, limits.products)
