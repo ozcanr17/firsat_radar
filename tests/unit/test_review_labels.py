@@ -17,3 +17,9 @@ def test_classify_high_severity_quality_problem() -> None:
     assert quality.polarity == "negative"
     assert quality.severity == "high"
     assert quality.confidence == 0.9
+
+
+def test_word_fragment_does_not_create_negative_signal() -> None:
+    signals = classify_review("Bu ürün vazgeçilmezim. Sağlam kargo ile geldi.")
+
+    assert all(signal.polarity != "negative" for signal in signals)

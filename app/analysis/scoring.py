@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from app.domain.analysis import MetricSet, OpportunityResult, ProductAnalysisInput
 
-MODEL_VERSION = "rules-tr-v1"
+MODEL_VERSION = "rules-tr-v2"
 WEIGHTS = {
     "demand": 0.25,
     "satisfaction": 0.20,

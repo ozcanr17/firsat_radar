@@ -4,7 +4,7 @@ Firsat Radar is a local-first product opportunity research application planned a
 
 ## Current status
 
-Stage 4 is complete. The application performs policy-gated collection and produces deterministic, evidence-backed product opportunity scores from real listing, detail, and identity-minimized public review data.
+Stage 5 is complete. The application provides a responsive local research panel for live products, product evidence, opportunity rankings, run provenance, safe settings, JSON APIs, and CSV exports.
 
 See [ADR 0002](docs/adr/0002-browser-data-access.md) and [HANDOFF.md](HANDOFF.md) for evidence and next steps.
 
@@ -42,9 +42,11 @@ Start the local application:
 .venv/bin/python -m app.cli serve
 ```
 
-Open `http://127.0.0.1:8000`. The health endpoint is available at `http://127.0.0.1:8000/healthz`.
+Open `http://127.0.0.1:8000`. Do not open `app/web/templates/index.html` directly: Jinja templates and static assets are rendered only through the running FastAPI application. The health endpoint is available at `http://127.0.0.1:8000/healthz`.
 
 The live APIs are available at `http://127.0.0.1:8000/api/v1/products` and `http://127.0.0.1:8000/api/v1/opportunities`. Opportunity results include metric evidence, coverage, confidence, risks, and an explicitly validation-required hypothesis.
+
+The panel pages are available at `/`, `/products`, `/products/{id}`, `/opportunities`, `/runs`, and `/settings`. CSV exports are available at `/exports/products.csv` and `/exports/opportunities.csv`.
 
 ## Checks
 

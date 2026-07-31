@@ -145,6 +145,14 @@ class AnalysisService:
     ) -> tuple[int, int]:
         created = 0
         updated = 0
+        incoming_topics = {signal.topic for signal in signals}
+        existing_labels = session.scalars(
+            select(ReviewLabel).where(ReviewLabel.review_id == review.id)
+        ).all()
+        for existing in existing_labels:
+            if existing.topic not in incoming_topics:
+                session.delete(existing)
+                updated += 1
         for signal in signals:
             label = session.scalar(
                 select(ReviewLabel).where(

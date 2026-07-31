@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Fırsatlar · {{ app_name }}{% endblock %}
+
+{% block topbar_actions %}
+<a class="button secondary compact" href="{{ url_for('opportunities_export') }}">CSV indir</a>
+{% endblock %}
+
+{% block content %}
+<section class="page-heading split-heading">
+    <div><span class="section-tag">KANITA DAYALI SIRALAMA</span><h1>Fırsat radarları</h1><p>Puan tek başına karar değildir; her sonuç kapsam, güven, neden ve riskleriyle sunulur.</p></div>
+    <div class="count-tile"><strong>{{ opportunities|length }}</strong><span>analiz sonucu</span></div>
+</section>
+
+{% if opportunities %}
+<div class="opportunity-list">
+    {% for opportunity in opportunities %}
+    <article class="opportunity-row-card">
+        <div class="rank-score"><span>#{{ loop.index }}</span><strong>{{ "%.1f"|format(opportunity.score) }}</strong><small>fırsat puanı</small></div>
+        <div class="opportunity-copy">
+            <div class="opportunity-topline"><span class="pattern-badge pattern-{{ opportunity.pattern }}">{{ pattern_labels.get(opportunity.pattern, opportunity.pattern or 'İzle') }}</span><span class="confidence">%{{ "%.0f"|format(opportunity.confidence * 100) }} güven</span></div>
+            <h2><a href="{{ url_for('product_page', product_id=opportunity.product_id) }}">{{ opportunity.title }}</a></h2>
+            <p>{{ opportunity.hypothesis.get('summary', '') }}</p>
+            <div class="metric-strip">
+                {% for label, value in [('Talep', opportunity.demand), ('Memnuniyet', opportunity.satisfaction), ('Sorun', opportunity.pain), ('İvme', opportunity.momentum), ('Fiyat', opportunity.price_position)] %}
+                <div><span>{{ label }}</span><strong>{{ "%.0f"|format(value) if value is not none else '—' }}</strong><i><b style="--value: {{ value or 0 }}%"></b></i></div>
+                {% endfor %}
+            </div>
+            <div class="evidence-row">
+                <span>{{ opportunity.reasons|length }} metrik kanıtı</span>
+                {% for risk in opportunity.risks %}<span class="risk-chip">{{ risk_labels.get(risk, risk) }}</span>{% endfor %}
+            </div>
+        </div>
+        <a class="round-link" href="{{ url_for('product_page', product_id=opportunity.product_id) }}">→</a>
+    </article>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-panel"><span>↗</span><h3>Fırsat analizi bulunamadı</h3><p>Canlı ürün verisini analiz ettikten sonra sonuçlar burada görünür.</p></div>
+{% endif %}
+{% endblock %}

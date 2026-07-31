@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page.product.title }} · {{ app_name }}{% endblock %}
+
+{% block topbar_actions %}
+<a class="button secondary compact" href="{{ page.product.source_url }}" target="_blank" rel="noreferrer">Kaynağı aç ↗</a>
+{% endblock %}
+
+{% block content %}
+<nav class="breadcrumb" aria-label="Sayfa yolu"><a href="{{ url_for('products_page') }}">Ürünler</a><span>›</span><span>{{ page.product.brand or 'Ürün detayı' }}</span></nav>
+
+<section class="product-hero">
+    <div class="product-hero-image">{% if page.product.image_url %}<img src="{{ page.product.image_url }}" alt="{{ page.product.title }}">{% else %}<span>◫</span>{% endif %}</div>
+    <div class="product-hero-copy">
+        <div class="opportunity-topline"><span class="section-tag">{{ page.product.brand or 'MARKA BELİRTİLMEDİ' }}</span>{% if page.opportunity %}<span class="pattern-badge pattern-{{ page.opportunity.pattern }}">{{ pattern_labels.get(page.opportunity.pattern, page.opportunity.pattern or 'İzle') }}</span>{% endif %}</div>
+        <h1>{{ page.product.title }}</h1>
+        <p>{{ page.product.category or 'Anne / Bebek / Oyuncak' }}</p>
+        <div class="product-price-row"><strong>{{ "{:,.2f}".format(page.product.price).replace(',', 'X').replace('.', ',').replace('X', '.') if page.product.price is not none else '—' }} <small>TL</small></strong><span class="rating-chip">★ {{ page.product.rating if page.product.rating is not none else '—' }}</span><span>{{ page.product.review_count or 0 }} değerlendirme</span></div>
+    </div>
+    {% if page.opportunity %}
+    <div class="hero-score"><span>Fırsat puanı</span><strong>{{ "%.1f"|format(page.opportunity.score) }}</strong><div class="score-track"><i style="--value: {{ page.opportunity.score }}%"></i></div><small>%{{ "%.0f"|format(page.opportunity.confidence * 100) }} güven</small></div>
+    {% endif %}
+</section>
+
+{% if page.opportunity %}
+<section class="section-block">
+    <div class="section-heading"><div><span class="section-index">01</span><h2>Fırsat kanıtı</h2></div><span class="coverage-chip">%{{ "%.0f"|format(page.opportunity.coverage * 100) }} kapsam</span></div>
+    <div class="analysis-layout">
+        <div class="metric-panel">
+            {% for label, value in [('Talep', page.opportunity.demand), ('Memnuniyet', page.opportunity.satisfaction), ('Sorun yoğunluğu', page.opportunity.pain), ('İvme', page.opportunity.momentum), ('Fiyat konumu', page.opportunity.price_position)] %}
+            <div class="metric-line"><div><span>{{ label }}</span><strong>{{ "%.0f"|format(value) if value is not none else '—' }}</strong></div><i><b style="--value: {{ value or 0 }}%"></b></i></div>
+            {% endfor %}
+        </div>
+        <div class="hypothesis-card">
+            <span class="section-tag light">DOĞRULAMA GEREKTİREN HİPOTEZ</span>
+            <blockquote>{{ page.opportunity.hypothesis.get('summary', '') }}</blockquote>
+            <div class="evidence-list">
+                {% for reason in page.opportunity.reasons %}
+                <div><span>{{ metric_labels.get(reason.metric, reason.metric) }}</span><strong>{{ "%.1f"|format(reason.score) }}</strong></div>
+                {% endfor %}
+            </div>
+            {% if page.opportunity.risks %}<div class="risk-list">{% for risk in page.opportunity.risks %}<span class="risk-chip">{{ risk_labels.get(risk, risk) }}</span>{% endfor %}</div>{% endif %}
+        </div>
+    </div>
+</section>
+{% endif %}
+
+<section class="detail-grid section-block">
+    <div class="data-card detail-card">
+        <div class="card-title"><div><span class="section-index">02</span><h2>Ürün özeti</h2></div>{% if page.product.detail_coverage is not none %}<span class="coverage-chip">%{{ "%.0f"|format(page.product.detail_coverage * 100) }} detay</span>{% endif %}</div>
+        <p class="description">{{ page.description or 'Bu ürün için görünür açıklama alınamadı.' }}</p>
+        {% if page.attributes %}<dl class="attribute-list">{% for label, value in page.attributes %}<div><dt>{{ label }}</dt><dd>{{ value }}</dd></div>{% endfor %}</dl>{% endif %}
+    </div>
+    <aside class="data-card trace-card">
+        <div class="card-title"><div><span class="section-index">03</span><h2>İzlenebilirlik</h2></div></div>
+        <dl class="trace-list">
+            <div><dt>Son gözlem</dt><dd>{{ page.product.observed_at|local_datetime }}</dd></div>
+            <div><dt>Fetch ID</dt><dd>#{{ page.product.fetch_id }}</dd></div>
+            <div><dt>Menşei</dt><dd>{{ page.origin or '—' }}</dd></div>
+            <div><dt>Stok</dt><dd>{{ page.stock or '—' }}</dd></div>
+            <div><dt>Yurt dışı satış</dt><dd>{{ page.overseas_sale or '—' }}</dd></div>
+            <div><dt>Kayıtlı yorum</dt><dd>{{ page.product.stored_review_count }}</dd></div>
+        </dl>
+    </aside>
+</section>
+
+<section class="section-block">
+    <div class="section-heading"><div><span class="section-index">04</span><h2>Snapshot geçmişi</h2></div><span class="muted">{{ page.snapshots|length }} gözlem</span></div>
+    <div class="data-card"><div class="responsive-table"><table><thead><tr><th>Gözlem</th><th>Fiyat</th><th>Eski fiyat</th><th>Puan</th><th>Değerlendirme</th></tr></thead><tbody>{% for snapshot in page.snapshots %}<tr><td>{{ snapshot.observed_at|local_datetime }}</td><td><strong>{{ snapshot.price if snapshot.price is not none else '—' }}</strong></td><td>{{ snapshot.old_price if snapshot.old_price is not none else '—' }}</td><td>{{ snapshot.rating if snapshot.rating is not none else '—' }}</td><td>{{ snapshot.review_count if snapshot.review_count is not none else '—' }}</td></tr>{% endfor %}</tbody></table></div></div>
+</section>
+
+<section class="section-block">
+    <div class="section-heading"><div><span class="section-index">05</span><h2>Görünür yorum kanıtı</h2></div>{% if page.review_url %}<a class="text-link" href="{{ page.review_url }}" target="_blank" rel="noreferrer">Yorum kaynağı ↗</a>{% endif %}</div>
+    {% if page.reviews %}
+    <div class="review-grid">
+        {% for review in page.reviews %}
+        <article class="review-card">
+            <div class="review-meta"><span>{{ review.review_date.strftime('%d.%m.%Y') if review.review_date else 'Tarih yok' }}</span><span>Kimlik çıkarıldı</span></div>
+            <p>{{ review.text }}</p>
+            {% if review.labels %}<div class="label-row">{% for label in review.labels %}<span class="label-chip polarity-{{ label.polarity }}">{{ topic_labels.get(label.topic, label.topic) }} · {{ label.polarity }}</span>{% endfor %}</div>{% endif %}
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-panel"><span>≋</span><h3>Kayıtlı yorum yok</h3><p>Bu ürün henüz detay zenginleştirmesine dahil edilmemiş olabilir.</p></div>
+    {% endif %}
+</section>
+{% endblock %}

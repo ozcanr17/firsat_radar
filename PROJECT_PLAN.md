@@ -32,13 +32,13 @@ Implement deltas, percentiles, rule-based Turkish review labels, opportunity sco
 
 ## Stage 5: Web interface
 
-Status: Ready.
+Status: Complete.
 
 Build the dashboard, products, product detail, opportunities, run history, settings, JSON API, and CSV export.
 
 ## Stage 6: Scheduling and hardening
 
-Status: Pending.
+Status: Ready.
 
 Add non-overlapping scheduling, retries, circuit breaker, retention, backups, and operational documentation.
 

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Ürünler · {{ app_name }}{% endblock %}
+
+{% block topbar_actions %}
+<a class="button secondary compact" href="{{ url_for('products_export') }}">CSV indir</a>
+{% endblock %}
+
+{% block content %}
+<section class="page-heading split-heading">
+    <div><span class="section-tag">ÜRÜN KATALOĞU</span><h1>Canlı ürünler</h1><p>Her satır kaynak URL, gözlem zamanı ve fetch provenance ile izlenebilir.</p></div>
+    <div class="count-tile"><strong>{{ products|length }}</strong><span>toplam ürün</span></div>
+</section>
+
+<div class="data-card catalog-card">
+    {% if products %}
+    <div class="responsive-table">
+        <table>
+            <thead><tr><th>#</th><th>Ürün</th><th>Fiyat</th><th>Puan</th><th>Değerlendirme</th><th>Detay</th><th>Fırsat</th><th></th></tr></thead>
+            <tbody>
+            {% for product in products %}
+                <tr>
+                    <td class="muted">{{ product.rank or '—' }}</td>
+                    <td>
+                        <a class="product-cell wide" href="{{ url_for('product_page', product_id=product.id) }}">
+                            <span class="product-thumb">{% if product.image_url %}<img src="{{ product.image_url }}" alt="">{% else %}◫{% endif %}</span>
+                            <span><strong>{{ product.title }}</strong><small>{{ product.brand or 'Marka belirtilmedi' }} · {{ product.observed_at|local_datetime }}</small></span>
+                        </a>
+                    </td>
+                    <td><strong>{{ "{:,.2f}".format(product.price).replace(',', 'X').replace('.', ',').replace('X', '.') if product.price is not none else '—' }}</strong><small class="unit"> TL</small></td>
+                    <td><span class="rating-chip">★ {{ product.rating if product.rating is not none else '—' }}</span></td>
+                    <td>{{ product.review_count if product.review_count is not none else '—' }}<small class="sub-value">{{ product.stored_review_count }} kayıtlı</small></td>
+                    <td>{% if product.detail_coverage is not none %}<span class="coverage-chip">%{{ "%.0f"|format(product.detail_coverage * 100) }}</span>{% else %}—{% endif %}</td>
+                    <td>{% if product.opportunity_score is not none %}<span class="table-score">{{ "%.1f"|format(product.opportunity_score) }}</span>{% else %}—{% endif %}</td>
+                    <td><a class="row-action" href="{{ url_for('product_page', product_id=product.id) }}">→</a></td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-panel"><span>◫</span><h3>Ürün bulunamadı</h3><p>Önce sınırlı canlı tarama çalıştırılmalı.</p></div>
+    {% endif %}
+</div>
+{% endblock %}

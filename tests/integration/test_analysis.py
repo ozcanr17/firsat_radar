@@ -129,6 +129,14 @@ async def test_analysis_is_traceable_and_idempotent(settings: Settings) -> None:
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/api/v1/opportunities")
         dashboard = await client.get("/")
+        products_page = await client.get("/products")
+        product_page = await client.get(f"/products/{product.id}")
+        opportunities_page = await client.get("/opportunities")
+        runs_page = await client.get("/runs")
+        settings_page = await client.get("/settings")
+        products_csv = await client.get("/exports/products.csv")
+        opportunities_csv = await client.get("/exports/opportunities.csv")
+        stylesheet = await client.get("/static/styles.css")
     application.state.engine.dispose()
     engine.dispose()
 
@@ -143,4 +151,15 @@ async def test_analysis_is_traceable_and_idempotent(settings: Settings) -> None:
     assert response.status_code == 200
     assert response.json()["count"] == 1
     assert response.json()["items"][0]["source_url"] == detail_fetch.url
-    assert "Kanıta dayalı analiz" in dashboard.text
+    assert "Öne çıkan fırsatlar" in dashboard.text
+    assert "Gerçek Ürün" in products_page.text
+    assert "Fırsat kanıtı" in product_page.text
+    assert "Fırsat radarları" in opportunities_page.text
+    assert "Tarama geçmişi" in runs_page.text
+    assert "HTML dosyasını doğrudan açma" in settings_page.text
+    assert products_csv.status_code == 200
+    assert "product_id,title" in products_csv.text
+    assert opportunities_csv.status_code == 200
+    assert "product_id,title,score" in opportunities_csv.text
+    assert stylesheet.status_code == 200
+    assert ".app-shell" in stylesheet.text

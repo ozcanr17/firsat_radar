@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23ff6b35'/%3E%3Ctext x='32' y='39' text-anchor='middle' font-size='22' font-family='Arial' font-weight='700' fill='white'%3EFR%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}">
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar">
+            <a class="brand" href="{{ url_for('dashboard') }}">
+                <span class="brand-mark">FR</span>
+                <span>
+                    <strong>Fırsat Radar</strong>
+                    <small>Pazar araştırma paneli</small>
+                </span>
+            </a>
+            <nav class="primary-nav" aria-label="Ana navigasyon">
+                <a class="nav-item {{ 'active' if active_page == 'dashboard' else '' }}" href="{{ url_for('dashboard') }}">
+                    <span class="nav-icon">⌂</span><span>Genel bakış</span>
+                </a>
+                <a class="nav-item {{ 'active' if active_page == 'products' else '' }}" href="{{ url_for('products_page') }}">
+                    <span class="nav-icon">◫</span><span>Ürünler</span>
+                </a>
+                <a class="nav-item {{ 'active' if active_page == 'opportunities' else '' }}" href="{{ url_for('opportunities_page') }}">
+                    <span class="nav-icon">↗</span><span>Fırsatlar</span>
+                </a>
+                <a class="nav-item {{ 'active' if active_page == 'runs' else '' }}" href="{{ url_for('runs_page') }}">
+                    <span class="nav-icon">◷</span><span>Çalışmalar</span>
+                </a>
+                <a class="nav-item {{ 'active' if active_page == 'settings' else '' }}" href="{{ url_for('settings_page') }}">
+                    <span class="nav-icon">⌘</span><span>Ayarlar</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <p class="sidebar-label">Canlı API</p>
+                <a href="/api/v1/products" target="_blank" rel="noreferrer">Ürün verisi <span>↗</span></a>
+                <a href="/api/v1/opportunities" target="_blank" rel="noreferrer">Fırsat verisi <span>↗</span></a>
+                <div class="environment-pill"><span></span>{{ environment }}</div>
+            </div>
+        </aside>
+        <main class="main-panel">
+            <header class="topbar">
+                <div>
+                    <p class="topbar-kicker">Yerel ve izlenebilir veri</p>
+                    <p class="topbar-time">Son görüntüleme · {{ generated_at|local_datetime }}</p>
+                </div>
+                <div class="topbar-actions">
+                    {% block topbar_actions %}{% endblock %}
+                    <span class="live-indicator"><span></span>Yerel sistem</span>
+                </div>
+            </header>
+            <div class="page-container">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+</body>
+</html>

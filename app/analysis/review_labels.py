@@ -71,6 +71,7 @@ HIGH_SEVERITY = (
     "kırık",
     "tehlik",
 )
+EXACT_TERMS = {"geç", "iyi", "zor"}
 
 
 def classify_review(text: str) -> tuple[ReviewSignal, ...]:
@@ -107,7 +108,13 @@ def normalize(value: str) -> str:
 
 
 def matching_terms(value: str, terms: tuple[str, ...]) -> tuple[str, ...]:
-    return tuple(term for term in terms if term in value)
+    return tuple(term for term in terms if term_matches(value, term))
+
+
+def term_matches(value: str, term: str) -> bool:
+    if term not in EXACT_TERMS:
+        return term in value
+    return re.search(rf"(?<!\w){re.escape(term)}(?!\w)", value) is not None
 
 
 def resolve_polarity(positive: tuple[str, ...], negative: tuple[str, ...]) -> str:

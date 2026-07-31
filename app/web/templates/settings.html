@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Ayarlar · {{ app_name }}{% endblock %}
+
+{% block content %}
+<section class="page-heading split-heading">
+    <div><span class="section-tag">GÜVENLİ ÇALIŞMA SINIRLARI</span><h1>Sistem ayarları</h1><p>Panel bu aşamada ayarları salt okunur gösterir; çalışma sınırları ortam değişkenleriyle yönetilir.</p></div>
+    <div class="count-tile safety-tile"><strong>6–12</strong><span>saniye istek aralığı</span></div>
+</section>
+
+<div class="settings-layout">
+    <section class="data-card settings-card">
+        <div class="card-title"><div><span class="section-index">01</span><h2>Veri erişimi</h2></div><span class="status-chip status-completed"><i></i>Politika kontrollü</span></div>
+        <dl class="settings-list">
+            {% for label, value in settings_rows %}<div><dt>{{ label }}</dt><dd>{{ value }}</dd></div>{% endfor %}
+        </dl>
+    </section>
+    <aside class="command-card">
+        <span class="section-tag light">DOĞRU ÇALIŞTIRMA</span>
+        <h2>HTML dosyasını doğrudan açma.</h2>
+        <p>Jinja şablonları ve statik stiller yalnızca FastAPI sunucusu üzerinden işlenir.</p>
+        <code>.venv/bin/python -m app.cli serve</code>
+        <p>Ardından tarayıcıda:</p>
+        <code>http://127.0.0.1:8000</code>
+    </aside>
+</div>
+
+<section class="guardrail-grid">
+    <article><span>01</span><h3>Tek sekme</h3><p>Tarayıcı adaptörü eşzamanlı istek üretmez.</p></article>
+    <article><span>02</span><h3>Otomatik duruş</h3><p>403, 429, CAPTCHA ve erişim engelinde çalışma durur.</p></article>
+    <article><span>03</span><h3>Kimlik minimizasyonu</h3><p>Yorumcu adı ve profil bilgisi kalıcı veriye alınmaz.</p></article>
+</section>
+{% endblock %}

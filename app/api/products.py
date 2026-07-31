@@ -11,6 +11,8 @@ from app.services.products import list_latest_products
 class ProductResponse(BaseModel):
     id: int
     title: str
+    brand: str | None
+    category: str | None
     source_url: str
     image_url: str | None
     observed_at: datetime
@@ -24,6 +26,9 @@ class ProductResponse(BaseModel):
     detail_coverage: float | None
     detail_confidence: float | None
     stored_review_count: int
+    opportunity_score: float | None
+    opportunity_pattern: str | None
+    analysis_confidence: float | None
 
 
 class ProductListResponse(BaseModel):
