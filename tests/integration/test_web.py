@@ -34,6 +34,7 @@ async def test_dashboard_has_explicit_empty_state(client: AsyncClient) -> None:
     assert response.status_code == 200
     assert "NO_DATA" in response.text
     assert "örnek veya sahte pazar verisi göstermez" in response.text
+    assert 'href="/static/styles.css"' in response.text
 
 
 @pytest.mark.asyncio

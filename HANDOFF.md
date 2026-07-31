@@ -6,7 +6,7 @@ Stage 12: Cloud control plane and multi-market foundation
 
 Status: Complete
 
-Release: 1.5.1
+Release: 1.5.2
 
 ## Delivered
 
@@ -23,6 +23,7 @@ Release: 1.5.1
 - Removed the Anne & Bebek-only restriction from product selection in the Esnaf Masası.
 - Added the Railway environment template and cloud deployment guide.
 - Added a Railway volume entrypoint that repairs mounted `/data` ownership before dropping privileges to the `radar` user.
+- Fixed production styling by serving the stylesheet from a relative path and trusting Railway proxy headers.
 
 ## Cloud operating model
 
@@ -67,6 +68,7 @@ Runtime SQLite, marketplace credentials, watch targets, business cases, policy f
 - Public Railway `/healthz` returned HTTP 200 with database status `ok`.
 - Public Railway `/` returned HTTP 401 with the `PazarRadar` Basic Auth challenge.
 - The persistent Railway volume mounted successfully and all nine database migrations ran.
+- Production dashboard markup now uses `/static/styles.css` without mixed-content risk.
 - No external product page was requested during this stage.
 
 ## Safety contract
