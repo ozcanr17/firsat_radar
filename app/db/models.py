@@ -210,3 +210,20 @@ class Setting(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
     )
+
+
+class RuntimeState(Base):
+    __tablename__ = "runtime_state"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    scheduler_status: Mapped[str] = mapped_column(String(40), default="idle", nullable=False)
+    last_job_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_job_finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    consecutive_failures: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    circuit_open_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error_code: Mapped[str | None] = mapped_column(String(120))
+    last_backup_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_retention_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )

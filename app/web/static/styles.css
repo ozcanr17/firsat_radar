@@ -1052,6 +1052,32 @@ dd {
     margin-top: 16px;
 }
 
+.runtime-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.runtime-grid article {
+    display: grid;
+    min-height: 96px;
+    align-content: center;
+    gap: 8px;
+    border: 1px solid var(--line);
+    border-radius: 17px;
+    padding: 18px;
+    background: rgba(255, 255, 255, 0.66);
+}
+
+.runtime-grid span {
+    color: var(--muted);
+    font-size: 0.65rem;
+}
+
+.runtime-grid strong {
+    font-size: 0.82rem;
+}
+
 .guardrail-grid article {
     border: 1px solid var(--line);
     border-radius: 18px;
@@ -1430,6 +1456,10 @@ dd {
         grid-template-columns: 1fr;
     }
 
+    .runtime-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .opportunity-row-card {
         grid-template-columns: 86px minmax(0, 1fr);
     }
@@ -1472,6 +1502,10 @@ dd {
     .opportunity-grid,
     .guardrail-grid,
     .review-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .runtime-grid {
         grid-template-columns: 1fr;
     }
 

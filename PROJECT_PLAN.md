@@ -38,12 +38,12 @@ Build the dashboard, products, product detail, opportunities, run history, setti
 
 ## Stage 6: Scheduling and hardening
 
-Status: Ready.
+Status: Complete.
 
 Add non-overlapping scheduling, retries, circuit breaker, retention, backups, and operational documentation.
 
 ## Stage 7: Acceptance and delivery
 
-Status: Pending.
+Status: Ready.
 
 Run the opt-in live smoke test, full quality checks, UI verification, and final documentation.

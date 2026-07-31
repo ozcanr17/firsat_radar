@@ -1,6 +1,7 @@
 import asyncio
 import json
 from dataclasses import asdict
+from datetime import UTC, datetime
 
 import typer
 import uvicorn
@@ -10,8 +11,12 @@ from app.config import Settings
 from app.db.migrations import upgrade_database
 from app.db.session import build_engine, build_session_factory
 from app.domain.crawl import CrawlLimits
+from app.scheduler import ScheduledPipeline, serve_scheduler
 from app.services.analysis import AnalysisService
+from app.services.backup import DatabaseBackupService
 from app.services.crawl import CrawlService
+from app.services.raw_store import RawStore
+from app.services.runtime_state import RuntimeStateService
 from app.sources.hepsiburada.browser import HepsiburadaBrowserAdapter
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
@@ -26,6 +31,25 @@ def build_crawl_service(settings: Settings) -> tuple[CrawlService, Engine]:
         lambda: HepsiburadaBrowserAdapter(settings),
     )
     return service, engine
+
+
+def build_scheduled_pipeline(settings: Settings) -> tuple[ScheduledPipeline, Engine]:
+    engine = build_engine(settings)
+    session_factory = build_session_factory(engine)
+    crawler = CrawlService(
+        settings,
+        session_factory,
+        lambda: HepsiburadaBrowserAdapter(settings),
+    )
+    pipeline = ScheduledPipeline(
+        settings=settings,
+        crawler=crawler,
+        analyzer=AnalysisService(session_factory),
+        backup=DatabaseBackupService(settings),
+        retention=RawStore(settings.data_dir / "raw"),
+        runtime_state=RuntimeStateService(session_factory),
+    )
+    return pipeline, engine
 
 
 def validate_source(source: str) -> None:
@@ -120,6 +144,99 @@ def analyze(
     try:
         summary = AnalysisService(session_factory).analyze(limit_products)
         typer.echo(json.dumps(asdict(summary), ensure_ascii=False))
+    finally:
+        engine.dispose()
+
+
+@app.command()
+def backup() -> None:
+    settings = Settings()
+    upgrade_database(settings)
+    engine = build_engine(settings)
+    try:
+        completed_at = datetime.now(UTC)
+        result = DatabaseBackupService(settings).create(completed_at)
+        RuntimeStateService(build_session_factory(engine)).mark_backup(completed_at)
+        typer.echo(
+            json.dumps(
+                {
+                    "path": str(result.path),
+                    "size_bytes": result.size_bytes,
+                    "integrity": result.integrity,
+                    "backups_removed": result.backups_removed,
+                },
+                ensure_ascii=False,
+            )
+        )
+    finally:
+        engine.dispose()
+
+
+@app.command("prune-raw")
+def prune_raw(
+    dry_run: bool = typer.Option(True, "--dry-run/--apply"),
+) -> None:
+    settings = Settings()
+    settings.ensure_data_directories()
+    result = RawStore(settings.data_dir / "raw").prune(
+        settings.raw_retention_days,
+        dry_run=dry_run,
+    )
+    if not dry_run:
+        upgrade_database(settings)
+        engine = build_engine(settings)
+        try:
+            RuntimeStateService(build_session_factory(engine)).mark_retention(datetime.now(UTC))
+        finally:
+            engine.dispose()
+    typer.echo(json.dumps(asdict(result), ensure_ascii=False))
+
+
+@app.command()
+def schedule() -> None:
+    settings = Settings()
+    upgrade_database(settings)
+    pipeline, engine = build_scheduled_pipeline(settings)
+    try:
+        asyncio.run(serve_scheduler(settings, pipeline))
+    except KeyboardInterrupt:
+        typer.echo("Scheduler stopped")
+    finally:
+        engine.dispose()
+
+
+@app.command("scheduled-run")
+def scheduled_run() -> None:
+    settings = Settings()
+    upgrade_database(settings)
+    pipeline, engine = build_scheduled_pipeline(settings)
+    try:
+        result = asyncio.run(pipeline.run())
+        typer.echo(json.dumps(asdict(result), ensure_ascii=False))
+    finally:
+        engine.dispose()
+
+
+@app.command("runtime-status")
+def runtime_status() -> None:
+    settings = Settings()
+    upgrade_database(settings)
+    engine = build_engine(settings)
+    try:
+        state = RuntimeStateService(build_session_factory(engine)).get()
+        typer.echo(json.dumps(asdict(state), ensure_ascii=False, default=str))
+    finally:
+        engine.dispose()
+
+
+@app.command("circuit-reset")
+def circuit_reset() -> None:
+    settings = Settings()
+    upgrade_database(settings)
+    engine = build_engine(settings)
+    try:
+        state = RuntimeStateService(build_session_factory(engine)).reset_circuit()
+        typer.echo(json.dumps(asdict(state), ensure_ascii=False, default=str))
     finally:
         engine.dispose()
 

@@ -4,7 +4,7 @@ Firsat Radar is a local-first product opportunity research application planned a
 
 ## Current status
 
-Stage 5 is complete. The application provides a responsive local research panel for live products, product evidence, opportunity rankings, run provenance, safe settings, JSON APIs, and CSV exports.
+Stage 6 is complete. The application provides the responsive research panel plus non-overlapping scheduling, bounded retry, circuit breaking, verified SQLite backups, raw-evidence retention, and persistent operational state.
 
 See [ADR 0002](docs/adr/0002-browser-data-access.md) and [HANDOFF.md](HANDOFF.md) for evidence and next steps.
 
@@ -32,6 +32,9 @@ Check the current policy and run a limited live crawl:
 .venv/bin/python -m app.cli crawl --source hepsiburada --limit-products 20
 .venv/bin/python -m app.cli crawl --source hepsiburada --limit-products 5 --limit-details 2
 .venv/bin/python -m app.cli analyze --limit-products 60
+.venv/bin/python -m app.cli backup
+.venv/bin/python -m app.cli prune-raw --dry-run
+.venv/bin/python -m app.cli runtime-status
 ```
 
 The browser runs visibly, uses one tab, and stops on an access block or CAPTCHA. Each requested detail includes only its first public rendered review page. Reviewer identity is discarded before persistence, and direct contact identifiers in review text are redacted.
@@ -47,6 +50,8 @@ Open `http://127.0.0.1:8000`. Do not open `app/web/templates/index.html` directl
 The live APIs are available at `http://127.0.0.1:8000/api/v1/products` and `http://127.0.0.1:8000/api/v1/opportunities`. Opportunity results include metric evidence, coverage, confidence, risks, and an explicitly validation-required hypothesis.
 
 The panel pages are available at `/`, `/products`, `/products/{id}`, `/opportunities`, `/runs`, and `/settings`. CSV exports are available at `/exports/products.csv` and `/exports/opportunities.csv`.
+
+Run the scheduler as a separate local process with `.venv/bin/python -m app.cli schedule`. See [Operations](docs/operations.md) before enabling it.
 
 ## Checks
 

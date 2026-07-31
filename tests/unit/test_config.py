@@ -17,3 +17,4 @@ def test_data_directories_are_created(tmp_path: Path) -> None:
     assert (tmp_path / "backups").is_dir()
     assert (tmp_path / "raw").is_dir()
     assert (tmp_path / "exports").is_dir()
+    assert (tmp_path / "runtime").is_dir()

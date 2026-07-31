@@ -18,6 +18,7 @@ EXPECTED_TABLES = {
     "products",
     "review_labels",
     "reviews",
+    "runtime_state",
     "settings",
     "sources",
 }

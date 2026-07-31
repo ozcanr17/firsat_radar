@@ -24,6 +24,15 @@ class Settings(BaseSettings):
     crawl_max_products: int = Field(default=60, ge=1, le=60)
     crawl_max_details: int = Field(default=20, ge=0, le=20)
     robots_cache_hours: int = Field(default=24, ge=1, le=24)
+    scheduler_interval_hours: int = Field(default=12, ge=1, le=168)
+    scheduler_products: int = Field(default=20, ge=1, le=60)
+    scheduler_details: int = Field(default=5, ge=0, le=20)
+    retry_attempts: int = Field(default=2, ge=1, le=3)
+    retry_delay_seconds: float = Field(default=30.0, ge=5.0, le=300.0)
+    circuit_failure_threshold: int = Field(default=3, ge=1, le=5)
+    circuit_cooldown_hours: int = Field(default=24, ge=1, le=72)
+    raw_retention_days: int = Field(default=7, ge=1, le=30)
+    backup_retention_count: int = Field(default=7, ge=1, le=30)
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -45,6 +54,7 @@ class Settings(BaseSettings):
         (self.data_dir / "exports").mkdir(exist_ok=True)
         (self.data_dir / "policy").mkdir(exist_ok=True)
         (self.data_dir / "browser").mkdir(exist_ok=True)
+        (self.data_dir / "runtime").mkdir(exist_ok=True)
 
 
 @lru_cache

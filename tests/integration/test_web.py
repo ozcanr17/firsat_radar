@@ -11,6 +11,10 @@ async def test_health_endpoint_reports_ready_database(client: AsyncClient) -> No
         "status": "ok",
         "database": "ok",
         "last_run_at": None,
+        "scheduler_status": "idle",
+        "consecutive_failures": 0,
+        "circuit_open_until": None,
+        "last_backup_at": None,
     }
 
 

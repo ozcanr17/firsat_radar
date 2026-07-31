@@ -15,6 +15,7 @@ from app.services.opportunities import OpportunityView, list_latest_opportunitie
 from app.services.product_detail import get_product_page
 from app.services.products import ProductView, list_latest_products
 from app.services.runs import list_runs
+from app.services.runtime_state import RuntimeStateService
 
 TEMPLATES_PATH = Path(__file__).with_name("templates")
 PATTERN_LABELS = {
@@ -41,6 +42,9 @@ STATUS_LABELS = {
     "policy_unavailable": "Politika erişilemedi",
     "parser_drift": "Parser sapması",
     "failed": "Başarısız",
+    "idle": "Bekliyor",
+    "circuit_open": "Devre açık",
+    "skipped_overlap": "Çakışma önlendi",
 }
 METRIC_LABELS = {
     "demand": "Talep",
@@ -150,8 +154,22 @@ def create_web_router(settings: Settings, session_factory: SessionFactory) -> AP
                     ("Maksimum ürün", str(settings.crawl_max_products)),
                     ("Maksimum detay", str(settings.crawl_max_details)),
                     ("Robots önbelleği", f"{settings.robots_cache_hours} saat"),
+                    ("Zamanlama aralığı", f"{settings.scheduler_interval_hours} saat"),
+                    (
+                        "Zamanlı kapsam",
+                        f"{settings.scheduler_products} ürün / {settings.scheduler_details} detay",
+                    ),
+                    ("Retry", f"En fazla {settings.retry_attempts} deneme"),
+                    (
+                        "Circuit breaker",
+                        f"{settings.circuit_failure_threshold} hata / "
+                        f"{settings.circuit_cooldown_hours} saat",
+                    ),
+                    ("Ham kanıt saklama", f"{settings.raw_retention_days} gün"),
+                    ("Yedek saklama", f"Son {settings.backup_retention_count} yedek"),
                     ("Veri dizini", str(settings.data_dir.resolve())),
-                )
+                ),
+                "runtime": RuntimeStateService(session_factory).get(),
             }
         )
         return templates.TemplateResponse(request=request, name="settings.html", context=context)

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "firsat-radar"
-version = "0.5.0"
+version = "0.6.0"
 description = "Local-first product opportunity radar"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
@@ -59,3 +59,7 @@ python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
 exclude = ["alembic"]
+
+[[tool.mypy.overrides]]
+module = ["apscheduler.*"]
+ignore_missing_imports = true
