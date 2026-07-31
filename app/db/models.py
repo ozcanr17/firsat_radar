@@ -76,6 +76,7 @@ class Product(Base):
     title: Mapped[str] = mapped_column(String(1000), nullable=False)
     brand: Mapped[str | None] = mapped_column(String(255))
     category: Mapped[str | None] = mapped_column(String(500))
+    image_url: Mapped[str | None] = mapped_column(String(2048))
     last_fetch_id: Mapped[int | None] = mapped_column(ForeignKey("fetches.id"))
     last_seen_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False

@@ -28,6 +28,8 @@ def test_initial_migration_creates_expected_tables(tmp_path: Path) -> None:
     upgrade_database(settings)
     engine = build_engine(settings)
     try:
-        assert set(inspect(engine).get_table_names()) == EXPECTED_TABLES
+        inspector = inspect(engine)
+        assert set(inspector.get_table_names()) == EXPECTED_TABLES
+        assert "image_url" in {column["name"] for column in inspector.get_columns("products")}
     finally:
         engine.dispose()

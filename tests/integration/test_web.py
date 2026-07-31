@@ -21,3 +21,11 @@ async def test_dashboard_has_explicit_empty_state(client: AsyncClient) -> None:
     assert response.status_code == 200
     assert "NO_DATA" in response.text
     assert "örnek veya sahte pazar verisi göstermez" in response.text
+
+
+@pytest.mark.asyncio
+async def test_products_api_has_empty_live_state(client: AsyncClient) -> None:
+    response = await client.get("/api/v1/products")
+
+    assert response.status_code == 200
+    assert response.json() == {"items": [], "count": 0}

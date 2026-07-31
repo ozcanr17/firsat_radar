@@ -2,6 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,6 +14,16 @@ class Settings(BaseSettings):
     data_dir: Path = Path("data")
     database_url: str | None = None
     timezone: str = "Europe/Istanbul"
+    hepsiburada_start_url: str = "https://www.hepsiburada.com/anne-bebek-oyuncak-c-2147483639"
+    browser_channel: str = "chrome"
+    browser_headless: bool = False
+    browser_navigation_timeout_seconds: int = Field(default=20, ge=5, le=60)
+    crawl_jitter_min_seconds: float = Field(default=6.0, ge=6.0, le=12.0)
+    crawl_jitter_max_seconds: float = Field(default=12.0, ge=6.0, le=12.0)
+    crawl_max_pages: int = Field(default=40, ge=1, le=40)
+    crawl_max_products: int = Field(default=60, ge=1, le=60)
+    crawl_max_details: int = Field(default=20, ge=0, le=20)
+    robots_cache_hours: int = Field(default=24, ge=1, le=24)
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -32,6 +43,8 @@ class Settings(BaseSettings):
         (self.data_dir / "backups").mkdir(exist_ok=True)
         (self.data_dir / "raw").mkdir(exist_ok=True)
         (self.data_dir / "exports").mkdir(exist_ok=True)
+        (self.data_dir / "policy").mkdir(exist_ok=True)
+        (self.data_dir / "browser").mkdir(exist_ok=True)
 
 
 @lru_cache

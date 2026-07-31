@@ -1,14 +1,35 @@
+import asyncio
 import json
+from dataclasses import asdict
 
 import typer
 import uvicorn
-from sqlalchemy import inspect, text
+from sqlalchemy import Engine, inspect, text
 
 from app.config import Settings
 from app.db.migrations import upgrade_database
-from app.db.session import build_engine
+from app.db.session import build_engine, build_session_factory
+from app.domain.crawl import CrawlLimits
+from app.services.crawl import CrawlService
+from app.sources.hepsiburada.browser import HepsiburadaBrowserAdapter
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
+
+
+def build_crawl_service(settings: Settings) -> tuple[CrawlService, Engine]:
+    engine = build_engine(settings)
+    session_factory = build_session_factory(engine)
+    service = CrawlService(
+        settings,
+        session_factory,
+        lambda: HepsiburadaBrowserAdapter(settings),
+    )
+    return service, engine
+
+
+def validate_source(source: str) -> None:
+    if source != "hepsiburada":
+        raise typer.BadParameter("Only hepsiburada is available")
 
 
 @app.command("init-db")
@@ -34,6 +55,57 @@ def doctor() -> None:
             "data_directory": str(settings.data_dir.resolve()),
         }
         typer.echo(json.dumps(result, ensure_ascii=False))
+    finally:
+        engine.dispose()
+
+
+@app.command("policy-check")
+def policy_check(
+    source: str = typer.Option("hepsiburada"),
+) -> None:
+    validate_source(source)
+    settings = Settings()
+    upgrade_database(settings)
+    service, engine = build_crawl_service(settings)
+    try:
+        decision = asyncio.run(service.policy_check())
+        typer.echo(
+            json.dumps(
+                {
+                    "source": source,
+                    "state": decision.state.value,
+                    "target_url": decision.url,
+                    "checked_at": decision.checked_at.isoformat(),
+                    "status_code": decision.status_code,
+                    "cached": decision.cached,
+                    "reason_code": decision.reason_code,
+                },
+                ensure_ascii=False,
+            )
+        )
+    finally:
+        engine.dispose()
+
+
+@app.command()
+def crawl(
+    source: str = typer.Option("hepsiburada"),
+    limit_products: int = typer.Option(20, min=1, max=60),
+    limit_details: int = typer.Option(0, min=0, max=20),
+) -> None:
+    validate_source(source)
+    if limit_details:
+        raise typer.BadParameter("Product detail collection starts in Stage 3")
+    settings = Settings()
+    upgrade_database(settings)
+    service, engine = build_crawl_service(settings)
+    try:
+        summary = asyncio.run(
+            service.crawl(CrawlLimits(products=limit_products, details=limit_details))
+        )
+        output = asdict(summary)
+        output["status"] = summary.status.value
+        typer.echo(json.dumps(output, ensure_ascii=False))
     finally:
         engine.dispose()
 

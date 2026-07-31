@@ -14,13 +14,13 @@ Create the Python project, configuration, migrations, CLI, health endpoint, and 
 
 ## Stage 2: Live listing slice
 
-Status: Ready.
+Status: Complete.
 
 Implement policy gate, live listing discovery, normalization, provenance, snapshots, and idempotent persistence.
 
 ## Stage 3: Product detail and reviews
 
-Status: Pending.
+Status: Ready.
 
 Collect only permitted fields, with explicit coverage and reason codes for unavailable data.
 
