@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from app.api.commerce import create_commerce_router
 from app.api.health import create_health_router
 from app.api.opportunities import create_opportunities_router
 from app.api.products import create_products_router
@@ -31,6 +32,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.state.engine = engine
     application.state.session_factory = session_factory
     application.include_router(create_health_router(session_factory))
+    application.include_router(create_commerce_router(session_factory))
     application.include_router(create_products_router(session_factory))
     application.include_router(create_opportunities_router(session_factory))
     application.include_router(create_web_router(active_settings, session_factory))

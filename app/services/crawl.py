@@ -27,6 +27,7 @@ from app.domain.crawl import (
     PolicyDecision,
     PolicyState,
     ProductDetailResult,
+    ProductStub,
     RunStatus,
     SourceAccessError,
 )
@@ -85,6 +86,48 @@ class CrawlService:
                     detail_results.append(await adapter.enrich(product))
                 details = tuple(detail_results)
             return self._persist_crawl(run_id, listing, details, category_name)
+        except SourceAccessError as error:
+            return self._finish_with_error(run_id, error.status, error.error_code)
+        except ParserDriftError as error:
+            return self._finish_with_error(run_id, RunStatus.PARSER_DRIFT, str(error))
+        except Exception:
+            self._finish_with_error(run_id, RunStatus.FAILED, "unexpected_error")
+            raise
+
+    async def refresh_product(self, product_id: int) -> CrawlSummary:
+        with self.session_factory() as session:
+            product = session.get(Product, product_id)
+            if product is None:
+                raise ValueError("product_not_found")
+            snapshot = session.scalar(
+                select(ProductSnapshot)
+                .where(ProductSnapshot.product_id == product_id)
+                .order_by(ProductSnapshot.observed_at.desc(), ProductSnapshot.id.desc())
+                .limit(1)
+            )
+            stub = ProductStub(
+                external_id=product.external_id,
+                source_url=product.canonical_url,
+                title=product.title,
+                price=snapshot.price if snapshot else None,
+                old_price=snapshot.old_price if snapshot else None,
+                rating=snapshot.rating if snapshot else None,
+                review_count=snapshot.review_count if snapshot else None,
+                rank=snapshot.rank if snapshot and snapshot.rank is not None else 1,
+                image_url=product.image_url,
+                delivery_text=None,
+                coverage=snapshot.coverage if snapshot else 0.0,
+                confidence=snapshot.confidence if snapshot else 0.0,
+            )
+        run_id = self._start_run()
+        try:
+            async with self.adapter_factory() as adapter:
+                decision = await adapter.policy_check(stub.source_url)
+                self._record_policy(run_id, decision)
+                if not decision.allowed:
+                    return self._finish_for_policy(run_id, decision)
+                detail = await adapter.enrich(stub)
+            return self._persist_product_refresh(run_id, product_id, detail)
         except SourceAccessError as error:
             return self._finish_with_error(run_id, error.status, error.error_code)
         except ParserDriftError as error:
@@ -365,6 +408,99 @@ class CrawlService:
         session.add(fetch)
         session.flush()
         return fetch
+
+    def _persist_product_refresh(
+        self,
+        run_id: int,
+        product_id: int,
+        detail: ProductDetailResult,
+    ) -> CrawlSummary:
+        with self.session_factory.begin() as session:
+            product = session.get_one(Product, product_id)
+            detail_fetch = self._persist_document_fetch(
+                session,
+                run_id,
+                detail.detail_document,
+                {"kind": "watchlist_product_detail", "reason_codes": detail.reason_codes},
+            )
+            product.canonical_url = detail.canonical_url
+            product.title = detail.title
+            product.brand = detail.brand
+            product.last_fetch_id = detail_fetch.id
+            product.last_seen_at = detail.detail_document.fetched_at
+            session.add(
+                ProductDetail(
+                    product_id=product.id,
+                    fetch_id=detail_fetch.id,
+                    observed_at=detail.detail_document.fetched_at,
+                    description_text=detail.description,
+                    attributes_json=json.dumps(detail.attributes, ensure_ascii=False),
+                    origin=detail.origin,
+                    overseas_sale=detail.overseas_sale,
+                    stock=detail.stock,
+                    review_url=detail.review_url,
+                    coverage=detail.coverage,
+                    confidence=detail.confidence,
+                    reason_codes_json=json.dumps(detail.reason_codes, ensure_ascii=False),
+                )
+            )
+            if detail.seller:
+                session.add(
+                    Offer(
+                        product_id=product.id,
+                        fetch_id=detail_fetch.id,
+                        observed_at=detail.detail_document.fetched_at,
+                        seller=detail.seller,
+                    )
+                )
+            reviews_created = 0
+            if detail.review_document is not None:
+                review_fetch = self._persist_document_fetch(
+                    session,
+                    run_id,
+                    detail.review_document,
+                    {
+                        "identity_redacted": True,
+                        "kind": "watchlist_public_reviews",
+                        "review_count": len(detail.reviews),
+                    },
+                )
+                for review in detail.reviews:
+                    existing = session.scalar(
+                        select(Review).where(
+                            Review.product_id == product.id,
+                            Review.source_review_id == review.source_review_id,
+                        )
+                    )
+                    if existing is not None:
+                        continue
+                    session.add(
+                        Review(
+                            product_id=product.id,
+                            fetch_id=review_fetch.id,
+                            source_review_id=review.source_review_id,
+                            rating=review.rating,
+                            review_date=review.review_date,
+                            text_redacted=review.text_redacted,
+                            source_url=review.source_url,
+                            observed_at=detail.review_document.fetched_at,
+                        )
+                    )
+                    reviews_created += 1
+            signature = hashlib.sha256(product.external_id.encode()).hexdigest()
+            return self._finish_in_session(
+                session,
+                run_id,
+                RunStatus.COMPLETED,
+                products_seen=1,
+                products_created=0,
+                products_updated=1,
+                snapshots_created=0,
+                details_created=1,
+                reviews_created=reviews_created,
+                fetches_created=self._fetch_count(session, run_id),
+                listing_signature=signature,
+            )
 
     def _finish_for_policy(self, run_id: int, decision: PolicyDecision) -> CrawlSummary:
         status_by_state = {

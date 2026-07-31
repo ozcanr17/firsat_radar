@@ -105,6 +105,7 @@ def build_pipeline(
     settings: Settings,
     crawler: FakeCrawler,
     catalog: FakeCatalog | None = None,
+    watchlist: FakeCatalog | None = None,
 ) -> tuple[
     ScheduledPipeline,
     RuntimeStateService,
@@ -134,6 +135,7 @@ def build_pipeline(
         retention,
         runtime,
         catalog=catalog,
+        watchlist=watchlist,
         sleeper=sleeper,
         now_provider=lambda: datetime(2026, 7, 31, tzinfo=UTC),
     )
@@ -186,6 +188,25 @@ async def test_pipeline_uses_bounded_catalog_batch(settings: Settings) -> None:
 
     assert result.status == "completed"
     assert catalog.page_counts == [settings.catalog_pages_per_run]
+    assert crawler.calls == 0
+    assert analyzer.calls == 1
+    engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_pipeline_prioritizes_watchlist_batch(settings: Settings) -> None:
+    crawler = FakeCrawler([crawl_summary(RunStatus.FAILED)])
+    watchlist = FakeCatalog(crawl_summary(RunStatus.COMPLETED))
+    pipeline, _, analyzer, _, _, _, engine = build_pipeline(
+        settings,
+        crawler,
+        watchlist=watchlist,
+    )
+
+    result = await pipeline.run()
+
+    assert result.status == "completed"
+    assert watchlist.page_counts == [settings.watchlist_targets_per_run]
     assert crawler.calls == 0
     assert analyzer.calls == 1
     engine.dispose()

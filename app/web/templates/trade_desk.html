@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}Esnaf Masası · {{ app_name }}{% endblock %}
+
+{% block content %}
+<section class="page-heading split-heading trade-heading">
+    <div><span class="section-tag">OPERASYON VE KÂRLILIK</span><h1>Esnaf masası</h1><p>Takip etmek istediğin ürünleri sıraya al, gerçek maliyetlerini gir ve sermaye bağlamadan önce birim ekonomiyi gör.</p></div>
+    <div class="trade-pulse"><span>Bugün</span><strong>{{ refresh_due_count }}</strong><small>yenileme bekliyor</small></div>
+</section>
+
+<div class="trade-summary-grid">
+    <div class="trade-stat"><span>İzleme hedefi</span><strong>{{ targets|length }}</strong><small>öncelikli araştırma</small></div>
+    <div class="trade-stat"><span>Maliyet senaryosu</span><strong>{{ business_cases|length }}</strong><small>hesaplanmış ürün</small></div>
+    <div class="trade-stat"><span>Karar disiplini</span><strong>GO</strong><small>yalnızca hedef marj aşılırsa</small></div>
+</div>
+
+<section class="trade-grid">
+    <article class="trade-panel">
+        <div class="panel-heading"><div><span class="section-tag">İZLEME KUYRUĞU</span><h2>Radarına hedef ekle</h2></div><span class="panel-number">01</span></div>
+        <form id="watch-form" class="trade-form">
+            <label><span>Hedef türü</span><select name="target_type"><option value="product">Ürün</option><option value="category">Kategori</option></select></label>
+            <label class="wide"><span>Kayıtlı ürün</span><select id="watch-product"><option value="">Elle adres gireceğim</option>{% for product in products %}<option value="{{ product.id }}" data-title="{{ product.title }}" data-url="{{ product.source_url }}" data-category="{{ product.category or '' }}">{{ product.title }}</option>{% endfor %}</select></label>
+            <label class="wide"><span>Başlık</span><input name="label" maxlength="500" required placeholder="Örn. Hafif kabin tipi bebek arabaları"></label>
+            <label class="wide"><span>Hepsiburada adresi</span><input name="source_url" type="url" placeholder="https://www.hepsiburada.com/..."></label>
+            <label><span>Öncelik</span><select name="priority"><option value="5">Çok yüksek</option><option value="4">Yüksek</option><option value="3" selected>Normal</option><option value="2">Düşük</option><option value="1">Arşiv</option></select></label>
+            <label><span>Yenileme</span><select name="refresh_interval_hours"><option value="6">6 saat</option><option value="12">12 saat</option><option value="24" selected>24 saat</option><option value="72">3 gün</option><option value="168">7 gün</option></select></label>
+            <input name="category" type="hidden">
+            <button type="submit" class="trade-primary">İzlemeye al</button>
+            <p class="form-status" id="watch-status" role="status"></p>
+        </form>
+    </article>
+
+    <article class="trade-panel economics-panel">
+        <div class="panel-heading"><div><span class="section-tag">BİRİM EKONOMİ</span><h2>Net kârı hesapla</h2></div><span class="panel-number">02</span></div>
+        <form id="economics-form" class="trade-form">
+            <label class="wide"><span>Ürün</span><select name="product_id" required><option value="">Ürün seç</option>{% for product in products %}<option value="{{ product.id }}">{{ product.title }} · {{ product.price or '—' }} TL</option>{% endfor %}</select></label>
+            <label><span>Alış maliyeti</span><input name="purchase_cost" type="number" min="0" step="0.01" required placeholder="0,00"></label>
+            <label><span>Komisyon %</span><input name="commission_rate" type="number" min="0" max="99" step="0.1" value="20"></label>
+            <label><span>Kargo</span><input name="shipping_cost" type="number" min="0" step="0.01" value="0"></label>
+            <label><span>Paketleme</span><input name="packaging_cost" type="number" min="0" step="0.01" value="0"></label>
+            <label><span>Reklam %</span><input name="advertising_rate" type="number" min="0" max="99" step="0.1" value="3"></label>
+            <label><span>İade payı %</span><input name="return_rate" type="number" min="0" max="99" step="0.1" value="5"></label>
+            <label><span>Vergi payı %</span><input name="tax_rate" type="number" min="0" max="99" step="0.1" value="0"></label>
+            <label><span>Diğer maliyet</span><input name="other_cost" type="number" min="0" step="0.01" value="0"></label>
+            <label><span>Hedef net marj %</span><input name="target_margin_rate" type="number" min="0" max="99" step="0.1" value="20"></label>
+            <label><span>Aylık adet</span><input name="monthly_units" type="number" min="0" step="1" value="10"></label>
+            <button type="submit" class="trade-primary">Senaryoyu hesapla</button>
+            <p class="form-status" id="economics-status" role="status"></p>
+        </form>
+    </article>
+</section>
+
+<section class="trade-section">
+    <div class="panel-heading"><div><span class="section-tag">ÖNCELİK MOTORU</span><h2>Sıradaki araştırmalar</h2></div><p>Öncelik, veri yaşı, fırsat puanı ve keşif durumuna göre hesaplanır.</p></div>
+    {% if targets %}
+    <div class="queue-list">
+        {% for target in targets %}
+        <article class="queue-item">
+            <div class="queue-score"><strong>{{ "%.0f"|format(target.queue_score) }}</strong><span>kuyruk puanı</span></div>
+            <div class="queue-copy"><div><span class="status-dot {{ 'due' if target.refresh_due else '' }}"></span>{{ 'Yenileme bekliyor' if target.refresh_due else 'Güncel' }} · Öncelik {{ target.priority }}/5</div><h3>{{ target.label }}</h3><p>{{ target.category or ('Ürün hedefi' if target.target_type == 'product' else 'Kategori hedefi') }} · {{ ("%.0f saat önce"|format(target.freshness_hours)) if target.freshness_hours is not none else 'Henüz keşfedilmedi' }}</p></div>
+            <div class="queue-actions">{% if target.source_url %}<a href="{{ target.source_url }}" target="_blank" rel="noreferrer">Kaynak ↗</a>{% endif %}<button type="button" data-delete-target="{{ target.id }}">Kaldır</button></div>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-panel"><span>◎</span><h3>İzleme kuyruğu boş</h3><p>İlk ürününü veya araştırmak istediğin kategoriyi yukarıdan ekle.</p></div>
+    {% endif %}
+</section>
+
+<section class="trade-section">
+    <div class="panel-heading"><div><span class="section-tag">SERMAYE KARARI</span><h2>Kârlılık senaryoları</h2></div><p>Pazar puanı tek başına yeterli değildir; alış fiyatın sonucu değiştirir.</p></div>
+    {% if business_cases %}
+    <div class="business-case-grid">
+        {% for item in business_cases %}
+        <article class="business-case decision-{{ item.economics.decision }}">
+            <div class="business-case-top"><span>{{ 'GO' if item.economics.decision == 'go' else ('BEKLE' if item.economics.decision == 'incomplete' else 'NO-GO') }}</span><strong>{{ "%.1f"|format(item.economics.margin_rate * 100) if item.economics.margin_rate is not none else '—' }}%</strong></div>
+            <h3>{{ item.title }}</h3>
+            <div class="economics-grid"><div><span>Birim katkı</span><strong>{{ item.economics.contribution if item.economics.contribution is not none else '—' }} TL</strong></div><div><span>Başabaş fiyat</span><strong>{{ item.economics.break_even_price if item.economics.break_even_price is not none else '—' }} TL</strong></div><div><span>Hedef satış</span><strong>{{ item.economics.target_sale_price if item.economics.target_sale_price is not none else '—' }} TL</strong></div><div><span>Aylık katkı</span><strong>{{ item.economics.monthly_contribution if item.economics.monthly_contribution is not none else '—' }} TL</strong></div></div>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-panel"><span>₺</span><h3>Henüz maliyet senaryosu yok</h3><p>Bir ürün seçip gerçek alış, komisyon, kargo, reklam ve iade paylarını gir.</p></div>
+    {% endif %}
+</section>
+
+<script>
+const watchForm = document.querySelector("#watch-form")
+const watchProduct = document.querySelector("#watch-product")
+const economicsForm = document.querySelector("#economics-form")
+
+watchProduct.addEventListener("change", () => {
+    const option = watchProduct.selectedOptions[0]
+    if (!option?.value) return
+    watchForm.elements.label.value = option.dataset.title
+    watchForm.elements.source_url.value = option.dataset.url
+    watchForm.elements.category.value = option.dataset.category
+})
+
+watchForm.addEventListener("submit", async event => {
+    event.preventDefault()
+    const data = Object.fromEntries(new FormData(watchForm))
+    data.priority = Number(data.priority)
+    data.refresh_interval_hours = Number(data.refresh_interval_hours)
+    data.source_url = data.source_url || null
+    data.category = data.category || null
+    await submitJson("/api/v1/watchlist", "POST", data, "watch-status")
+})
+
+economicsForm.addEventListener("submit", async event => {
+    event.preventDefault()
+    const data = Object.fromEntries(new FormData(economicsForm))
+    const productId = data.product_id
+    delete data.product_id
+    for (const key of ["purchase_cost", "shipping_cost", "packaging_cost", "other_cost"]) data[key] = Number(data[key])
+    for (const key of ["commission_rate", "advertising_rate", "return_rate", "tax_rate", "target_margin_rate"]) data[key] = Number(data[key]) / 100
+    data.monthly_units = Number(data.monthly_units)
+    data.notes = null
+    await submitJson(`/api/v1/business-cases/${productId}`, "PUT", data, "economics-status")
+})
+
+document.querySelectorAll("[data-delete-target]").forEach(button => {
+    button.addEventListener("click", async () => {
+        const response = await fetch(`/api/v1/watchlist/${button.dataset.deleteTarget}`, {method: "DELETE"})
+        if (response.ok) window.location.reload()
+    })
+})
+
+async function submitJson(url, method, data, statusId) {
+    const status = document.getElementById(statusId)
+    status.textContent = "Kaydediliyor…"
+    const response = await fetch(url, {method, headers: {"Content-Type": "application/json"}, body: JSON.stringify(data)})
+    if (response.ok) {
+        status.textContent = "Kaydedildi"
+        window.location.reload()
+        return
+    }
+    const error = await response.json()
+    status.textContent = `Kaydedilemedi: ${error.detail ?? "Geçersiz değer"}`
+}
+</script>
+{% endblock %}

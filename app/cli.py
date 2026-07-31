@@ -22,6 +22,7 @@ from app.services.crawl import CrawlService
 from app.services.raw_store import RawStore
 from app.services.runtime_state import RuntimeStateService
 from app.services.static_site import export_static_site
+from app.services.watchlist import WatchlistMonitor
 from app.sources.hepsiburada.browser import HepsiburadaBrowserAdapter
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
@@ -60,6 +61,7 @@ def build_scheduled_pipeline(settings: Settings) -> tuple[ScheduledPipeline, Eng
         retention=RawStore(settings.data_dir / "raw"),
         runtime_state=RuntimeStateService(session_factory),
         catalog=catalog,
+        watchlist=WatchlistMonitor(session_factory, crawler),
     )
     return pipeline, engine
 
@@ -246,6 +248,20 @@ def export_site(
     upgrade_database(settings)
     result = export_static_site(settings, Path(output))
     typer.echo(json.dumps(asdict(result), ensure_ascii=False, default=str))
+
+
+@app.command("watchlist-refresh")
+def watchlist_refresh(
+    limit: int = typer.Option(3, min=1, max=10),
+) -> None:
+    settings = Settings()
+    upgrade_database(settings)
+    service, engine = build_crawl_service(settings)
+    try:
+        summary = asyncio.run(WatchlistMonitor(service.session_factory, service).refresh_due(limit))
+        typer.echo(json.dumps(asdict(summary), ensure_ascii=False, default=str))
+    finally:
+        engine.dispose()
 
 
 @app.command()

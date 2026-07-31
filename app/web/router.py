@@ -11,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 from app.config import Settings
 from app.db.session import SessionFactory
 from app.services.catalog import CatalogMonitor
+from app.services.commerce import list_business_cases, list_watch_targets
 from app.services.dashboard import get_dashboard_stats
 from app.services.opportunities import OpportunityView, list_latest_opportunities
 from app.services.product_detail import get_product_page
@@ -171,6 +172,30 @@ def create_web_router(settings: Settings, session_factory: SessionFactory) -> AP
             context=context,
         )
 
+    @router.get("/trade-desk", response_class=HTMLResponse, name="trade_desk_page")
+    def trade_desk_page(request: Request) -> HTMLResponse:
+        targets = list_watch_targets(session_factory)
+        business_cases = list_business_cases(session_factory)
+        products = [
+            product
+            for product in list_latest_products(session_factory, 500)
+            if product.category and "anne" in product.category.casefold()
+        ]
+        context = shared_context(request, "trade_desk")
+        context.update(
+            {
+                "targets": targets,
+                "refresh_due_count": sum(item.refresh_due for item in targets),
+                "business_cases": business_cases,
+                "products": products,
+            }
+        )
+        return templates.TemplateResponse(
+            request=request,
+            name="trade_desk.html",
+            context=context,
+        )
+
     @router.get("/runs", response_class=HTMLResponse, name="runs_page")
     def runs_page(request: Request) -> HTMLResponse:
         context = shared_context(request, "runs")
@@ -202,9 +227,16 @@ def create_web_router(settings: Settings, session_factory: SessionFactory) -> AP
                     ("Robots önbelleği", f"{settings.robots_cache_hours} saat"),
                     ("Zamanlama aralığı", f"{settings.scheduler_interval_hours} saat"),
                     (
-                        "Katalog taraması",
-                        f"Çalışma başına {settings.catalog_pages_per_run} sayfa / "
-                        f"sayfa başına {settings.catalog_details_per_page} detay",
+                        "İzleme kuyruğu",
+                        (
+                            f"Çalışma başına {settings.watchlist_targets_per_run} ürün"
+                            if settings.watchlist_enabled
+                            else "Kapalı"
+                        ),
+                    ),
+                    (
+                        "Eski katalog taraması",
+                        "Kapalı" if not settings.catalog_enabled else "Elle etkinleştirilmiş",
                     ),
                     (
                         "Zamanlı kapsam",

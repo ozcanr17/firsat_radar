@@ -15,23 +15,23 @@ The interval scheduler waits for the configured interval before its first job. U
 .venv/bin/python -m app.cli scheduled-run
 ```
 
-## Catalog monitoring
+## Watchlist monitoring
 
-The catalog queue contains 17 public top-level categories. Each category persists its next page, observed page size, last product signature, pages scanned, completed sweeps, and last status. The hourly scheduler processes three least-recently-crawled category pages by default. Each page enriches at most two products with public detail and first-page review evidence.
+The local scheduler processes up to three due, resolved product targets per run. Priority combines the operator's priority, data age, opportunity score, and unresolved discovery state. Refreshes open only the known product page and classify only reviews already visible there.
 
 ```bash
-.venv/bin/python -m app.cli catalog-seed
+.venv/bin/python -m app.cli watchlist-refresh --limit 3
+```
+
+Product and category targets are managed from `/trade-desk`. A manually entered product URL that is not yet linked to a collected product remains unresolved until sitemap discovery can safely identify it.
+
+## Legacy catalog monitor
+
+The former 17-category query-pagination monitor is disabled by default and does not meet the current PazarRadar v2 contract. Its maintenance commands remain available for migration inspection only and must not be enabled for production collection.
+
+```bash
 .venv/bin/python -m app.cli catalog-status
-.venv/bin/python -m app.cli catalog-run --pages 1
 ```
-
-Reset only the catalog cursor progress after a verified pagination change:
-
-```bash
-.venv/bin/python -m app.cli catalog-reset --confirm
-```
-
-Resetting cursors does not delete products, snapshots, reviews, fetch provenance, or raw evidence.
 
 ## Non-overlap
 
@@ -100,4 +100,4 @@ curl http://127.0.0.1:8000/healthz
 
 The Settings panel shows scheduler state, failure count, circuit expiry, last backup, and last retention time.
 
-The web process and scheduler are independent. `open-panel` only starts the web process. Continuous monitoring requires the `schedule` command to remain running.
+The web process and scheduler are independent. `open-panel` only starts the web process. Continuous local watchlist monitoring requires the `schedule` command to remain running. Hosted recurring collection remains disabled until sitemap XML acceptance succeeds.

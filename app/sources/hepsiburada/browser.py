@@ -38,7 +38,7 @@ ROBOTS_URL = f"{BASE_URL}/robots.txt"
 PARSER_VERSION = "hepsiburada-listing-browser-v1"
 DETAIL_PARSER_VERSION = "hepsiburada-detail-browser-v1"
 REVIEW_PARSER_VERSION = "hepsiburada-review-browser-v1"
-USER_AGENT = "PazarRadar/1.3 (+https://github.com/ozcanr17/firsat_radar)"
+USER_AGENT = "PazarRadar/1.4 (+https://github.com/ozcanr17/firsat_radar)"
 DAILY_REQUEST_LIMIT = 800
 PRODUCT_CARD_SELECTOR = "main article"
 PRODUCT_LINK_SELECTOR = "a[href*='-p-'], a[href*='-pm-']"
@@ -241,15 +241,13 @@ class HepsiburadaBrowserAdapter:
         reviews: tuple[ReviewStub, ...] = ()
         review_document: FetchedDocument | None = None
         reason_codes = list(parsed.reason_codes)
-        if parsed.review_url:
-            reviews, review_document = await self._collect_reviews(
-                canonical_url,
-                parsed.review_url,
-            )
-            if not reviews:
-                reason_codes.append("reviews_unavailable")
-        else:
-            reason_codes.append("review_url_unavailable")
+        reviews, review_document = await self._collect_visible_reviews(
+            page,
+            canonical_url,
+            status_code,
+        )
+        if not reviews:
+            reason_codes.append("visible_reviews_unavailable")
         return ProductDetailResult(
             listing_external_id=product.external_id,
             canonical_url=canonical_url,
@@ -270,16 +268,12 @@ class HepsiburadaBrowserAdapter:
             review_document=review_document,
         )
 
-    async def _collect_reviews(
+    async def _collect_visible_reviews(
         self,
+        page: Page,
         canonical_url: str,
-        review_url: str,
+        status_code: int | None,
     ) -> tuple[tuple[ReviewStub, ...], FetchedDocument]:
-        decision = await self.policy_check(review_url)
-        if not decision.allowed:
-            raise SourceAccessError(RunStatus.POLICY_DENIED, "review_policy_denied")
-        page, status_code = await self._navigate(review_url, "review")
-        await page.wait_for_selector("main", state="attached")
         projected = cast(
             list[dict[str, Any]],
             await page.locator("main").evaluate(
@@ -320,13 +314,13 @@ class HepsiburadaBrowserAdapter:
                 for item in projected
             ],
             canonical_url,
-            page.url,
+            canonical_url,
             observed_at,
         )
         evidence = build_review_evidence(reviews)
         coverage = 1.0 if reviews else 0.0
         document = FetchedDocument(
-            url=page.url,
+            url=canonical_url,
             fetched_at=observed_at,
             status_code=status_code,
             content_hash=hashlib.sha256(evidence.encode()).hexdigest(),

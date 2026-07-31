@@ -67,6 +67,32 @@ async def test_product_search_and_recommendations_have_empty_state(
     assert "Bu filtrede öneri yok" in recommendations.text
 
 
+@pytest.mark.asyncio
+async def test_trade_desk_and_watchlist_api(client: AsyncClient) -> None:
+    page = await client.get("/trade-desk")
+    created = await client.post(
+        "/api/v1/watchlist",
+        json={
+            "target_type": "product",
+            "label": "Takip edilecek bebek arabası",
+            "source_url": "https://www.hepsiburada.com/ornek-p-HBCV123?magaza=x",
+            "priority": 5,
+            "refresh_interval_hours": 12,
+        },
+    )
+    listed = await client.get("/api/v1/watchlist")
+    deleted = await client.delete(f"/api/v1/watchlist/{created.json()['id']}")
+
+    assert page.status_code == 200
+    assert "Esnaf masası" in page.text
+    assert "İzleme kuyruğu boş" in page.text
+    assert created.status_code == 201
+    assert created.json()["source_url"] == "https://www.hepsiburada.com/ornek-p-HBCV123"
+    assert created.json()["refresh_due"] is True
+    assert listed.json()["count"] == 1
+    assert deleted.status_code == 204
+
+
 def test_direct_index_is_a_static_launcher() -> None:
     launcher = (Path(__file__).parents[2] / "app" / "web" / "templates" / "index.html").read_text(
         encoding="utf-8"
@@ -94,4 +120,5 @@ def test_static_site_export_has_safe_empty_state(settings: Settings, tmp_path: P
     assert "PazarRadar" in html
     assert "Henüz yayımlanabilir öneri yok" in html
     assert "kâr, satış veya üretim başarısı garantisi vermez" in html
+    assert "Hızlı kârlılık testi" in html
     assert (tmp_path / "public" / ".nojekyll").exists()

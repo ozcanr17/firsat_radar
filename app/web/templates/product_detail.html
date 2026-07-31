@@ -45,6 +45,15 @@
 </section>
 {% endif %}
 
+{% if page.business_case %}
+<section class="section-block product-economics decision-{{ page.business_case.economics.decision }}">
+    <div><span class="section-tag">BİRİM EKONOMİ</span><h2>{{ 'GO' if page.business_case.economics.decision == 'go' else 'NO-GO' }} · {{ "%.1f"|format(page.business_case.economics.margin_rate * 100) if page.business_case.economics.margin_rate is not none else '—' }}% net marj</h2><p>Girilen alış ve operasyon maliyetleriyle hesaplandı.</p></div>
+    <dl><div><dt>Birim katkı</dt><dd>{{ page.business_case.economics.contribution or '—' }} TL</dd></div><div><dt>Başabaş fiyat</dt><dd>{{ page.business_case.economics.break_even_price or '—' }} TL</dd></div><div><dt>Hedef satış</dt><dd>{{ page.business_case.economics.target_sale_price or '—' }} TL</dd></div><div><dt>Aylık katkı</dt><dd>{{ page.business_case.economics.monthly_contribution or '—' }} TL</dd></div></dl>
+</section>
+{% else %}
+<section class="economics-callout"><div><span class="section-tag">EKSİK KARAR GİRDİSİ</span><strong>Gerçek maliyet girilmeden ticari karar tamamlanmaz.</strong></div><a href="{{ url_for('trade_desk_page') }}">Esnaf masasında hesapla →</a></section>
+{% endif %}
+
 <section class="detail-grid section-block">
     <div class="data-card detail-card">
         <div class="card-title"><div><span class="section-index">02</span><h2>Ürün özeti</h2></div>{% if page.product.detail_coverage is not none %}<span class="coverage-chip">%{{ "%.0f"|format(page.product.detail_coverage * 100) }} detay</span>{% endif %}</div>
@@ -71,6 +80,7 @@
 
 <section class="section-block">
     <div class="section-heading"><div><span class="section-index">05</span><h2>Görünür yorum kanıtı</h2></div>{% if page.review_url %}<a class="text-link" href="{{ page.review_url }}" target="_blank" rel="noreferrer">Yorum kaynağı ↗</a>{% endif %}</div>
+    {% if page.pain_clusters %}<div class="pain-clusters">{% for cluster in page.pain_clusters %}<div><span>{{ topic_labels.get(cluster.topic, cluster.topic) }}</span><strong>{{ cluster.negative_count }}</strong><small>%{{ "%.0f"|format(cluster.share * 100) }} olumsuz pay · {{ cluster.high_severity_count }} yüksek önem</small><i><b style="--value: {{ cluster.share * 100 }}%"></b></i></div>{% endfor %}</div>{% endif %}
     {% if page.reviews %}
     <div class="review-grid">
         {% for review in page.reviews %}

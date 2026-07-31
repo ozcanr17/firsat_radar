@@ -7,6 +7,7 @@ from sqlalchemy import select
 
 from app.db.models import Product, ProductDetail, ProductSnapshot, Review, ReviewLabel
 from app.db.session import SessionFactory
+from app.services.commerce import BusinessCaseView, get_business_case
 from app.services.opportunities import OpportunityView, list_latest_opportunities
 from app.services.products import ProductView, list_latest_products
 
@@ -40,6 +41,14 @@ class ReviewView:
 
 
 @dataclass(frozen=True)
+class PainClusterView:
+    topic: str
+    negative_count: int
+    high_severity_count: int
+    share: float
+
+
+@dataclass(frozen=True)
 class ProductPageView:
     product: ProductView
     description: str | None
@@ -52,6 +61,8 @@ class ProductPageView:
     snapshots: tuple[SnapshotView, ...]
     reviews: tuple[ReviewView, ...]
     opportunity: OpportunityView | None
+    pain_clusters: tuple[PainClusterView, ...]
+    business_case: BusinessCaseView | None
 
 
 def get_product_page(
@@ -93,6 +104,7 @@ def get_product_page(
             .order_by(Review.review_date.desc(), Review.id.desc())
         ).all()
         review_views = []
+        cluster_counts: dict[str, list[int]] = {}
         for review in reviews:
             labels = session.scalars(
                 select(ReviewLabel)
@@ -117,6 +129,12 @@ def get_product_page(
                     ),
                 )
             )
+            for label in labels:
+                if label.polarity != "negative":
+                    continue
+                counts = cluster_counts.setdefault(label.topic, [0, 0])
+                counts[0] += 1
+                counts[1] += label.severity == "high"
     attributes = json.loads(detail.attributes_json) if detail else {}
     reason_codes = json.loads(detail.reason_codes_json) if detail else []
     return ProductPageView(
@@ -141,4 +159,17 @@ def get_product_page(
         ),
         reviews=tuple(review_views),
         opportunity=opportunity,
+        pain_clusters=tuple(
+            PainClusterView(
+                topic=topic,
+                negative_count=counts[0],
+                high_severity_count=counts[1],
+                share=round(counts[0] / len(reviews), 4) if reviews else 0.0,
+            )
+            for topic, counts in sorted(
+                cluster_counts.items(),
+                key=lambda item: (-item[1][0], item[0]),
+            )
+        ),
+        business_case=get_business_case(session_factory, product_id),
     )

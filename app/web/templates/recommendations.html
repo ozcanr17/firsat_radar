@@ -30,6 +30,7 @@
             <div class="opportunity-topline"><span class="route-badge">{{ item.route_label }}</span><span class="confidence">{{ item.category or 'Kategori yok' }}</span></div>
             <h2><a href="{{ url_for('product_page', product_id=item.product_id) }}">{{ item.title }}</a></h2>
             <p>{{ item.summary }}</p>
+            {% if item.economics %}<div class="decision-economics"><span class="economics-decision decision-{{ item.economics.decision }}">{{ 'GO' if item.economics.decision == 'go' else ('NO-GO' if item.economics.decision == 'no_go' else 'EKSİK') }}</span><div><small>Birim katkı</small><strong>{{ item.economics.contribution if item.economics.contribution is not none else '—' }} TL</strong></div><div><small>Net marj</small><strong>{{ "%.1f"|format(item.economics.margin_rate * 100) if item.economics.margin_rate is not none else '—' }}%</strong></div><div><small>Hedef satış</small><strong>{{ item.economics.target_sale_price if item.economics.target_sale_price is not none else '—' }} TL</strong></div></div>{% endif %}
             <div class="decision-grid">
                 <div><h3>Kanıt</h3><ul>{% for evidence in item.evidence %}<li>{{ evidence }}</li>{% endfor %}</ul></div>
                 <div><h3>Risk</h3><ul>{% for risk in item.risks %}<li>{{ risk }}</li>{% endfor %}</ul></div>

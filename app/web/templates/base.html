@@ -31,6 +31,9 @@
                 <a class="nav-item {{ 'active' if active_page == 'recommendations' else '' }}" href="{{ url_for('recommendations_page') }}">
                     <span class="nav-icon">◇</span><span>Ticari öneriler</span>
                 </a>
+                <a class="nav-item {{ 'active' if active_page == 'trade_desk' else '' }}" href="{{ url_for('trade_desk_page') }}">
+                    <span class="nav-icon">₺</span><span>Esnaf masası</span>
+                </a>
                 <a class="nav-item {{ 'active' if active_page == 'runs' else '' }}" href="{{ url_for('runs_page') }}">
                     <span class="nav-icon">◷</span><span>Çalışmalar</span>
                 </a>

@@ -66,7 +66,13 @@ Status: Complete.
 
 Adopt the Anne & Bebek scope, disable legacy query-pagination scheduling, add a public static research panel, and provide CI, Pages, and guarded manual bot workflows.
 
-## Stage 11: Sitemap discovery and category briefs
+## Stage 11: Operator trade desk and watchlist refresh
+
+Status: Complete.
+
+Add prioritized product/category watch targets, direct due-product refresh, review pain clusters, persisted unit economics, GO/NO-GO decisions, and a public browser-side profitability calculator.
+
+## Stage 12: Sitemap discovery and category briefs
 
 Status: Blocked by source acceptance.
 

@@ -247,3 +247,47 @@ class RuntimeState(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
     )
+
+
+class WatchTarget(Base):
+    __tablename__ = "watch_targets"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"))
+    target_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    label: Mapped[str] = mapped_column(String(500), nullable=False)
+    source_url: Mapped[str | None] = mapped_column(String(2048), unique=True)
+    category: Mapped[str | None] = mapped_column(String(500))
+    priority: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
+    refresh_interval_hours: Mapped[int] = mapped_column(Integer, default=24, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_status: Mapped[str] = mapped_column(String(40), default="pending", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+
+
+class BusinessCase(Base):
+    __tablename__ = "business_cases"
+    __table_args__ = (UniqueConstraint("product_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), nullable=False)
+    purchase_cost: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    commission_rate: Mapped[float] = mapped_column(Float, default=0.2, nullable=False)
+    shipping_cost: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, nullable=False)
+    packaging_cost: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, nullable=False)
+    advertising_rate: Mapped[float] = mapped_column(Float, default=0.03, nullable=False)
+    return_rate: Mapped[float] = mapped_column(Float, default=0.05, nullable=False)
+    tax_rate: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    other_cost: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0, nullable=False)
+    target_margin_rate: Mapped[float] = mapped_column(Float, default=0.2, nullable=False)
+    monthly_units: Mapped[int] = mapped_column(Integer, default=10, nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )

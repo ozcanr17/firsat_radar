@@ -133,6 +133,23 @@ async def test_analysis_is_traceable_and_idempotent(settings: Settings) -> None:
         product_page = await client.get(f"/products/{product.id}")
         opportunities_page = await client.get("/opportunities")
         recommendations_page = await client.get("/recommendations")
+        business_case = await client.put(
+            f"/api/v1/business-cases/{product.id}",
+            json={
+                "purchase_cost": 40,
+                "commission_rate": 0.15,
+                "shipping_cost": 5,
+                "packaging_cost": 2,
+                "advertising_rate": 0.02,
+                "return_rate": 0.03,
+                "tax_rate": 0,
+                "other_cost": 0,
+                "target_margin_rate": 0.2,
+                "monthly_units": 20,
+            },
+        )
+        trade_desk = await client.get("/trade-desk")
+        recommendations_with_economics = await client.get("/recommendations")
         runs_page = await client.get("/runs")
         settings_page = await client.get("/settings")
         products_csv = await client.get("/exports/products.csv")
@@ -156,9 +173,16 @@ async def test_analysis_is_traceable_and_idempotent(settings: Settings) -> None:
     assert "Gerçek Ürün" in products_page.text
     assert "Ürün veya marka ara" in products_page.text
     assert "Fırsat kanıtı" in product_page.text
+    assert "yüksek önem" in product_page.text
+    assert "Gerçek maliyet girilmeden" in product_page.text
     assert "Fırsat radarları" in opportunities_page.text
     assert "Kanıttan aksiyona" in recommendations_page.text
     assert "Al-sat adayı" in recommendations_page.text
+    assert business_case.status_code == 200
+    assert business_case.json()["economics"]["decision"] == "go"
+    assert business_case.json()["economics"]["contribution"] == "33.00"
+    assert "Gerçek Ürün" in trade_desk.text
+    assert "Birim katkı" in recommendations_with_economics.text
     assert "Tarama geçmişi" in runs_page.text
     assert "Katalog kapsamı" in settings_page.text
     assert products_csv.status_code == 200

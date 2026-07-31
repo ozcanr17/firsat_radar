@@ -9,7 +9,15 @@ from sqlalchemy import func, select
 
 from app.config import Settings
 from app.db.migrations import upgrade_database
-from app.db.models import CrawlRun, Fetch, Product, ProductDetail, ProductSnapshot, Review
+from app.db.models import (
+    CrawlRun,
+    Fetch,
+    Product,
+    ProductDetail,
+    ProductSnapshot,
+    Review,
+    WatchTarget,
+)
 from app.db.session import build_engine, build_session_factory
 from app.domain.crawl import (
     CrawlLimits,
@@ -23,7 +31,9 @@ from app.domain.crawl import (
     RunStatus,
 )
 from app.main import create_app
+from app.services.commerce import WatchTargetInput, add_watch_target
 from app.services.crawl import CrawlService
+from app.services.watchlist import WatchlistMonitor
 
 
 class FakeAdapter:
@@ -212,5 +222,56 @@ async def test_detail_and_reviews_are_persisted_with_review_idempotency(
         assert product is not None
         assert product.brand == "Canlı Marka"
         assert product.canonical_url.endswith("HBCV0000000001")
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_watchlist_refreshes_due_product_detail(settings: Settings) -> None:
+    upgrade_database(settings)
+    engine = build_engine(settings)
+    session_factory = build_session_factory(engine)
+    service = CrawlService(
+        settings,
+        session_factory,
+        lambda: FakeAdapter(build_listing(), build_detail()),
+    )
+    try:
+        await service.crawl(CrawlLimits(products=1))
+        with session_factory() as session:
+            product = session.scalar(select(Product))
+            assert product is not None
+            product_id = product.id
+            product_url = product.canonical_url
+        target = add_watch_target(
+            session_factory,
+            WatchTargetInput(
+                target_type="product",
+                label="Öncelikli canlı ürün",
+                source_url=product_url,
+                category="Anne / Bebek / Oyuncak",
+                priority=5,
+                refresh_interval_hours=1,
+            ),
+        )
+        with session_factory.begin() as session:
+            stored_target = session.get_one(WatchTarget, target.id)
+            stored_target.last_checked_at = datetime(2020, 1, 1, tzinfo=UTC)
+
+        result = await WatchlistMonitor(session_factory, service).refresh_due(limit=1)
+
+        with session_factory() as session:
+            detail_count = session.scalar(select(func.count()).select_from(ProductDetail))
+            review_count = session.scalar(select(func.count()).select_from(Review))
+            stored_target = session.get_one(WatchTarget, target.id)
+
+        assert result.queued == 1
+        assert result.refreshed == 1
+        assert result.stopped is False
+        assert result.items[0].product_id == product_id
+        assert detail_count == 1
+        assert review_count == 1
+        assert stored_target.last_status == "completed"
+        assert stored_target.last_checked_at is not None
     finally:
         engine.dispose()

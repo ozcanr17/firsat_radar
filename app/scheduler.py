@@ -103,6 +103,7 @@ class ScheduledPipeline:
         retention: RetentionOperation,
         runtime_state: RuntimeStateService,
         catalog: CatalogOperation | None = None,
+        watchlist: CatalogOperation | None = None,
         sleeper: Callable[[float], Awaitable[None]] = asyncio.sleep,
         now_provider: Callable[[], datetime] | None = None,
     ) -> None:
@@ -113,6 +114,7 @@ class ScheduledPipeline:
         self.retention = retention
         self.runtime_state = runtime_state
         self.catalog = catalog
+        self.watchlist = watchlist
         self.sleeper = sleeper
         self.now_provider = now_provider or (lambda: datetime.now(UTC))
         self.lock_path = settings.data_dir / "runtime" / "scheduled-crawl.lock"
@@ -250,6 +252,11 @@ class ScheduledPipeline:
         )
         for attempt in range(1, self.settings.retry_attempts + 1):
             try:
+                if self.settings.watchlist_enabled and self.watchlist is not None:
+                    summary = await self.watchlist.run_batch(
+                        self.settings.watchlist_targets_per_run
+                    )
+                    return summary, attempt
                 if self.settings.catalog_enabled and self.catalog is not None:
                     summary = await self.catalog.run_batch(self.settings.catalog_pages_per_run)
                     return summary, attempt

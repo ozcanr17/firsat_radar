@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from app.db.session import SessionFactory
+from app.services.commerce import UnitEconomics, list_business_cases
 from app.services.opportunities import OpportunityView, list_latest_opportunities
 from app.services.products import ProductView, list_latest_products
 
@@ -21,6 +22,7 @@ class BusinessRecommendation:
     evidence: tuple[str, ...]
     risks: tuple[str, ...]
     validation_steps: tuple[str, ...]
+    economics: UnitEconomics | None
 
 
 @dataclass(frozen=True)
@@ -52,8 +54,13 @@ def build_recommendations(
     limit: int = 100,
 ) -> RecommendationResult:
     products = {product.id: product for product in list_latest_products(session_factory, 500)}
+    economics = {item.product_id: item.economics for item in list_business_cases(session_factory)}
     recommendations = [
-        recommend(opportunity, products[opportunity.product_id])
+        recommend(
+            opportunity,
+            products[opportunity.product_id],
+            economics.get(opportunity.product_id),
+        )
         for opportunity in list_latest_opportunities(session_factory, 500)
         if opportunity.product_id in products
     ]
@@ -77,6 +84,7 @@ def build_recommendations(
 def recommend(
     opportunity: OpportunityView,
     product: ProductView,
+    economics: UnitEconomics | None = None,
 ) -> BusinessRecommendation:
     route = resolve_route(opportunity, product)
     readiness = round(
@@ -96,9 +104,10 @@ def recommend(
         readiness=readiness,
         confidence=opportunity.confidence,
         summary=route_summary(route),
-        evidence=build_evidence(opportunity, product),
-        risks=build_risks(opportunity, product, route),
+        evidence=build_evidence(opportunity, product, economics),
+        risks=build_risks(opportunity, product, route, economics),
         validation_steps=validation_steps(route),
+        economics=economics,
     )
 
 
@@ -123,6 +132,7 @@ def resolve_route(opportunity: OpportunityView, product: ProductView) -> str:
 def build_evidence(
     opportunity: OpportunityView,
     product: ProductView,
+    economics: UnitEconomics | None = None,
 ) -> tuple[str, ...]:
     evidence = []
     if product.review_count is not None:
@@ -135,6 +145,8 @@ def build_evidence(
         evidence.append(f"Sorun yoğunluğu {opportunity.pain:.0f}/100")
     if opportunity.momentum is not None:
         evidence.append(f"İvme skoru {opportunity.momentum:.0f}/100")
+    if economics and economics.margin_rate is not None:
+        evidence.append(f"Hesaplanan net marj %{economics.margin_rate * 100:.1f}")
     return tuple(evidence[:4])
 
 
@@ -142,10 +154,13 @@ def build_risks(
     opportunity: OpportunityView,
     product: ProductView,
     route: str,
+    economics: UnitEconomics | None = None,
 ) -> tuple[str, ...]:
     risks = [RISK_LABELS.get(risk, risk) for risk in opportunity.risks]
-    if route in {"resale", "local_production"}:
+    if route in {"resale", "local_production"} and economics is None:
         risks.append("Komisyon, lojistik, iade ve vergi sonrası marj doğrulanmadı")
+    if economics and economics.decision == "no_go":
+        risks.append("Girilen maliyetlerle hedef marj karşılanmıyor")
     if route == "local_production":
         risks.append("Üretilebilirlik, mevzuat ve sertifikasyon gereksinimleri doğrulanmadı")
     if product.detail_coverage is None:
@@ -176,7 +191,7 @@ def validation_steps(route: str) -> tuple[str, ...]:
             "Kanıt belirgin biçimde iyileşmeden sermaye bağlama",
         ),
         "research": (
-            "Ürün detayını ve ilk herkese açık yorum örneğini topla",
+            "Ürün detayını ve ürün sayfasında görünür yorum örneğini topla",
             "En az iki farklı tarihte fiyat ve değerlendirme snapshot'ı oluştur",
             "Tedarik maliyeti ve rakip satıcı sayısını manuel doğrula",
         ),

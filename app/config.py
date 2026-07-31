@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     scheduler_interval_hours: int = Field(default=1, ge=1, le=168)
     scheduler_products: int = Field(default=200, ge=1, le=500)
     scheduler_details: int = Field(default=5, ge=0, le=20)
+    watchlist_enabled: bool = True
+    watchlist_targets_per_run: int = Field(default=3, ge=1, le=10)
     catalog_enabled: bool = False
     catalog_pages_per_run: int = Field(default=3, ge=1, le=10)
     catalog_products_per_page: int = Field(default=60, ge=1, le=60)

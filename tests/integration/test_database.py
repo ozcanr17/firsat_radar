@@ -9,6 +9,7 @@ from app.db.session import build_engine
 EXPECTED_TABLES = {
     "alembic_version",
     "analyses",
+    "business_cases",
     "category_cursors",
     "crawl_runs",
     "fetches",
@@ -22,6 +23,7 @@ EXPECTED_TABLES = {
     "runtime_state",
     "settings",
     "sources",
+    "watch_targets",
 }
 
 

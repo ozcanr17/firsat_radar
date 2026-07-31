@@ -28,4 +28,13 @@ This repository implements the supplied PazarRadar v2 document under the followi
 - GitHub Actions collection is manual and policy-first until sitemap access is accepted.
 - Public recommendations are research priorities, never guarantees of demand, profit, or production feasibility.
 
+## Operating loop
+
+1. Add known products or category hypotheses to the local Esnaf Masası.
+2. The scheduler refreshes up to three due, resolved product targets per run.
+3. Only reviews already visible on the product page are minimized and classified.
+4. Review pain clusters, market signals, and data freshness determine research priority.
+5. The operator enters real purchase and operating costs.
+6. A product becomes actionable only after market evidence and unit economics agree.
+
 Implementation rationale and source-access status are recorded in [ADR 0003](docs/adr/0003-pazarradar-v2-and-github-delivery.md).
