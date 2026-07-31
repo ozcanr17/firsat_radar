@@ -173,6 +173,11 @@ async def test_pipeline_retries_transient_exception_then_completes(settings: Set
 
 @pytest.mark.asyncio
 async def test_pipeline_uses_bounded_catalog_batch(settings: Settings) -> None:
+    settings = Settings(
+        environment="test",
+        data_dir=settings.data_dir,
+        catalog_enabled=True,
+    )
     crawler = FakeCrawler([crawl_summary(RunStatus.FAILED)])
     catalog = FakeCatalog(crawl_summary(RunStatus.COMPLETED))
     pipeline, _, analyzer, _, _, _, engine = build_pipeline(settings, crawler, catalog)

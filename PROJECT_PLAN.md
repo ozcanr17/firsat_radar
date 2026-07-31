@@ -60,8 +60,14 @@ Status: Complete.
 
 Add product/category search, category and route filters, evidence-gated commercial recommendations, bounded detail/review collection, and starvation-free analysis prioritization.
 
-## Stage 10: Custom watchlists and product freshness
+## Stage 10: PazarRadar v2 and GitHub delivery
 
-Status: Ready.
+Status: Complete.
 
-Allow operator-defined product/category watch targets and prioritize stale, changed, high-signal products for recurring detail and public-review refresh.
+Adopt the Anne & Bebek scope, disable legacy query-pagination scheduling, add a public static research panel, and provide CI, Pages, and guarded manual bot workflows.
+
+## Stage 11: Sitemap discovery and category briefs
+
+Status: Blocked by source acceptance.
+
+Validate an advertised sitemap as XML without bypass behavior, discover only the three initial Anne & Bebek subcategories, and generate category-level commercial briefs from permitted product-page evidence.

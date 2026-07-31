@@ -5,6 +5,9 @@ from httpx import AsyncClient
 from typer.testing import CliRunner
 
 from app.cli import app
+from app.config import Settings
+from app.db.migrations import upgrade_database
+from app.services.static_site import export_static_site
 
 
 @pytest.mark.asyncio
@@ -79,3 +82,16 @@ def test_open_panel_command_is_available() -> None:
     result = CliRunner().invoke(app, ["open-panel", "--help"])
 
     assert result.exit_code == 0
+
+
+def test_static_site_export_has_safe_empty_state(settings: Settings, tmp_path: Path) -> None:
+    upgrade_database(settings)
+    result = export_static_site(settings, tmp_path / "public")
+    html = result.output_path.read_text(encoding="utf-8")
+
+    assert result.products == 0
+    assert result.recommendations == 0
+    assert "PazarRadar" in html
+    assert "Henüz yayımlanabilir öneri yok" in html
+    assert "kâr, satış veya üretim başarısı garantisi vermez" in html
+    assert (tmp_path / "public" / ".nojekyll").exists()

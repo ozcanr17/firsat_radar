@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     database_url: str | None = None
     timezone: str = "Europe/Istanbul"
     hepsiburada_start_url: str = "https://www.hepsiburada.com/anne-bebek-oyuncak-c-2147483639"
-    browser_channel: str = "chrome"
+    browser_channel: str | None = "chrome"
     browser_headless: bool = False
     browser_navigation_timeout_seconds: int = Field(default=20, ge=5, le=60)
     crawl_jitter_min_seconds: float = Field(default=6.0, ge=6.0, le=12.0)
@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     scheduler_interval_hours: int = Field(default=1, ge=1, le=168)
     scheduler_products: int = Field(default=200, ge=1, le=500)
     scheduler_details: int = Field(default=5, ge=0, le=20)
-    catalog_enabled: bool = True
+    catalog_enabled: bool = False
     catalog_pages_per_run: int = Field(default=3, ge=1, le=10)
     catalog_products_per_page: int = Field(default=60, ge=1, le=60)
     catalog_details_per_page: int = Field(default=2, ge=0, le=5)

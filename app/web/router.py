@@ -191,7 +191,7 @@ def create_web_router(settings: Settings, session_factory: SessionFactory) -> AP
                 "settings_rows": (
                     ("Kaynak", "Hepsiburada"),
                     ("Başlangıç adresi", settings.hepsiburada_start_url),
-                    ("Tarayıcı", settings.browser_channel),
+                    ("Tarayıcı", settings.browser_channel or "Playwright Chromium"),
                     (
                         "İstek aralığı",
                         f"{settings.crawl_jitter_min_seconds:.0f}-"

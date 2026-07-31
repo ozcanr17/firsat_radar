@@ -1,8 +1,13 @@
+import json
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
+
+from app.domain.crawl import RunStatus, SourceAccessError
 from app.services.raw_store import RawStore
+from app.sources.hepsiburada.browser import DAILY_REQUEST_LIMIT, DailyRequestQuota
 
 
 def test_raw_retention_supports_dry_run_and_bounded_delete(tmp_path: Path) -> None:
@@ -25,3 +30,22 @@ def test_raw_retention_supports_dry_run_and_bounded_delete(tmp_path: Path) -> No
     assert recent_path.exists() is True
     assert applied.deleted == 1
     assert applied.bytes_deleted > 0
+
+
+def test_daily_request_quota_stops_at_hard_limit(tmp_path: Path) -> None:
+    state_path = tmp_path / "quota.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "date": datetime.now(UTC).date().isoformat(),
+                "count": DAILY_REQUEST_LIMIT,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SourceAccessError) as raised:
+        DailyRequestQuota(state_path).consume()
+
+    assert raised.value.status == RunStatus.FAILED
+    assert raised.value.error_code == "daily_quota_reached"

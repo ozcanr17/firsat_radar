@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import json
 import random
 from datetime import UTC, datetime
 from pathlib import Path
@@ -37,6 +38,8 @@ ROBOTS_URL = f"{BASE_URL}/robots.txt"
 PARSER_VERSION = "hepsiburada-listing-browser-v1"
 DETAIL_PARSER_VERSION = "hepsiburada-detail-browser-v1"
 REVIEW_PARSER_VERSION = "hepsiburada-review-browser-v1"
+USER_AGENT = "PazarRadar/1.3 (+https://github.com/ozcanr17/firsat_radar)"
+DAILY_REQUEST_LIMIT = 800
 PRODUCT_CARD_SELECTOR = "main article"
 PRODUCT_LINK_SELECTOR = "a[href*='-p-'], a[href*='-pm-']"
 
@@ -55,6 +58,9 @@ class HepsiburadaBrowserAdapter:
             settings.data_dir / "policy" / "hepsiburada-last-request.txt",
             settings.crawl_jitter_min_seconds,
             settings.crawl_jitter_max_seconds,
+        )
+        self.daily_quota = DailyRequestQuota(
+            settings.data_dir / "policy" / "hepsiburada-daily-quota.json"
         )
 
     async def __aenter__(self) -> Self:
@@ -78,6 +84,7 @@ class HepsiburadaBrowserAdapter:
             return self.policy.decide(cached, url, from_cache=True)
         page = await self._active_page()
         await self.rate_limiter.wait()
+        self.daily_quota.consume()
         try:
             response = await page.goto(ROBOTS_URL, wait_until="domcontentloaded")
         except PlaywrightTimeoutError as error:
@@ -104,6 +111,7 @@ class HepsiburadaBrowserAdapter:
     async def discover(self, start_url: str, limits: CrawlLimits) -> ListingResult:
         limits.validate()
         await self.rate_limiter.wait()
+        self.daily_quota.consume()
         page = await self._active_page()
         try:
             response = await page.goto(start_url, wait_until="domcontentloaded")
@@ -331,6 +339,7 @@ class HepsiburadaBrowserAdapter:
 
     async def _navigate(self, url: str, page_kind: str) -> tuple[Page, int | None]:
         await self.rate_limiter.wait()
+        self.daily_quota.consume()
         page = await self._active_page()
         try:
             response = await page.goto(url, wait_until="domcontentloaded")
@@ -351,10 +360,11 @@ class HepsiburadaBrowserAdapter:
         self.playwright = await async_playwright().start()
         self.context = await self.playwright.chromium.launch_persistent_context(
             user_data_dir=self.settings.data_dir / "browser",
-            channel=self.settings.browser_channel,
+            channel=self.settings.browser_channel or None,
             headless=self.settings.browser_headless,
             locale="tr-TR",
             timezone_id=self.settings.timezone,
+            user_agent=USER_AGENT,
         )
         self.page = self.context.pages[0] if self.context.pages else await self.context.new_page()
         self.page.set_default_navigation_timeout(
@@ -398,3 +408,25 @@ class DomainRateLimiter:
 
     def mark(self) -> None:
         self.state_path.write_text(datetime.now(UTC).isoformat(), encoding="utf-8")
+
+
+class DailyRequestQuota:
+    def __init__(self, state_path: Path) -> None:
+        self.state_path = state_path
+
+    def consume(self) -> None:
+        today = datetime.now(UTC).date().isoformat()
+        count = 0
+        if self.state_path.exists():
+            try:
+                payload = json.loads(self.state_path.read_text(encoding="utf-8"))
+                if payload.get("date") == today:
+                    count = int(payload.get("count", 0))
+            except (json.JSONDecodeError, OSError, TypeError, ValueError):
+                count = 0
+        if count >= DAILY_REQUEST_LIMIT:
+            raise SourceAccessError(RunStatus.FAILED, "daily_quota_reached")
+        self.state_path.write_text(
+            json.dumps({"date": today, "count": count + 1}),
+            encoding="utf-8",
+        )

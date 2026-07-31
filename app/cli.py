@@ -4,6 +4,7 @@ import threading
 import webbrowser
 from dataclasses import asdict
 from datetime import UTC, datetime
+from pathlib import Path
 
 import typer
 import uvicorn
@@ -20,6 +21,7 @@ from app.services.catalog import CatalogMonitor
 from app.services.crawl import CrawlService
 from app.services.raw_store import RawStore
 from app.services.runtime_state import RuntimeStateService
+from app.services.static_site import export_static_site
 from app.sources.hepsiburada.browser import HepsiburadaBrowserAdapter
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
@@ -234,6 +236,16 @@ def catalog_reset(
         typer.echo(json.dumps({"reset": monitor.reset_progress()}))
     finally:
         engine.dispose()
+
+
+@app.command("export-site")
+def export_site(
+    output: str = typer.Option("public"),
+) -> None:
+    settings = Settings()
+    upgrade_database(settings)
+    result = export_static_site(settings, Path(output))
+    typer.echo(json.dumps(asdict(result), ensure_ascii=False, default=str))
 
 
 @app.command()
