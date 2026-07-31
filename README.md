@@ -4,7 +4,7 @@ Firsat Radar is a local-first product opportunity research application planned a
 
 ## Current status
 
-Stage 8 is complete. The application continuously traverses 17 public top-level Hepsiburada categories with persistent page cursors, bounded round-robin scheduling, traceable live-data collection, evidence-based analysis, verified backups, and operational safeguards.
+Stage 9 is complete. The application continuously traverses 17 public top-level Hepsiburada categories, supports product/category search, and turns evidence into explicit al-sat, local-production, watch, avoid, or research routes with risks and validation steps.
 
 See [ADR 0002](docs/adr/0002-browser-data-access.md) and [HANDOFF.md](HANDOFF.md) for evidence and next steps.
 
@@ -31,7 +31,7 @@ Check the current policy and run a limited live crawl:
 .venv/bin/python -m app.cli policy-check --source hepsiburada
 .venv/bin/python -m app.cli crawl --source hepsiburada --limit-products 20
 .venv/bin/python -m app.cli crawl --source hepsiburada --limit-products 5 --limit-details 2
-.venv/bin/python -m app.cli analyze --limit-products 60
+.venv/bin/python -m app.cli analyze --limit-products 200
 .venv/bin/python -m app.cli backup
 .venv/bin/python -m app.cli prune-raw --dry-run
 .venv/bin/python -m app.cli runtime-status
@@ -53,11 +53,13 @@ For server-only operation, use `.venv/bin/python -m app.cli serve`.
 
 The live APIs are available at `http://127.0.0.1:8000/api/v1/products` and `http://127.0.0.1:8000/api/v1/opportunities`. Opportunity results include metric evidence, coverage, confidence, risks, and an explicitly validation-required hypothesis.
 
-The panel pages are available at `/`, `/products`, `/products/{id}`, `/opportunities`, `/runs`, and `/settings`. CSV exports are available at `/exports/products.csv` and `/exports/opportunities.csv`.
+The panel pages are available at `/`, `/products`, `/products/{id}`, `/opportunities`, `/recommendations`, `/runs`, and `/settings`. The Products page supports text, category, and sort filters. The Commercial Recommendations page exposes the suggested route, evidence, risks, confidence, and concrete validation steps. CSV exports are available at `/exports/products.csv` and `/exports/opportunities.csv`.
 
 Run the scheduler as a separate local process with `.venv/bin/python -m app.cli schedule`. See [Operations](docs/operations.md) before enabling it.
 
-The scheduler runs hourly by default and processes three category pages per job. It does not attempt an unbounded full-market crawl in one session. Each category keeps its own page cursor; the crawler learns the visible page size, detects repeated or short terminal pages, completes the sweep, and starts a new sweep later. Coverage accumulates over time while the same robots, jitter, access-block, and circuit-breaker controls remain active.
+The scheduler runs hourly by default and processes three category pages per job. Each page may enrich at most two products with public detail and first-page review evidence. It does not attempt an unbounded full-market crawl in one session. Each category keeps its own page cursor; the crawler learns the visible page size, detects repeated or short terminal pages, completes the sweep, and starts a new sweep later. Coverage accumulates over time while the same robots, jitter, access-block, and circuit-breaker controls remain active.
+
+The scheduler is a separate foreground process. Opening the panel does not start market collection. Keep `.venv/bin/python -m app.cli schedule` running in another terminal for hourly monitoring.
 
 ## Checks
 

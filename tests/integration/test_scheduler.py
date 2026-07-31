@@ -42,7 +42,7 @@ class FakeAnalyzer:
     def __init__(self) -> None:
         self.calls = 0
 
-    def analyze(self, limit: int = 60) -> AnalysisSummary:
+    def analyze(self, limit: int = 200) -> AnalysisSummary:
         self.calls += 1
         return AnalysisSummary(
             products_seen=1,

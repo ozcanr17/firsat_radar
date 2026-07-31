@@ -48,6 +48,22 @@ async def test_opportunities_api_has_empty_live_state(client: AsyncClient) -> No
     assert response.json() == {"items": [], "count": 0}
 
 
+@pytest.mark.asyncio
+async def test_product_search_and_recommendations_have_empty_state(
+    client: AsyncClient,
+) -> None:
+    products = await client.get(
+        "/products",
+        params={"q": "telefon", "category": "Telefon", "sort": "price_asc"},
+    )
+    recommendations = await client.get("/recommendations", params={"route": "resale"})
+
+    assert products.status_code == 200
+    assert "Eşleşen ürün bulunamadı" in products.text
+    assert recommendations.status_code == 200
+    assert "Bu filtrede öneri yok" in recommendations.text
+
+
 def test_direct_index_is_a_static_launcher() -> None:
     launcher = (Path(__file__).parents[2] / "app" / "web" / "templates" / "index.html").read_text(
         encoding="utf-8"

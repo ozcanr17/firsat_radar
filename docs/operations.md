@@ -17,7 +17,7 @@ The interval scheduler waits for the configured interval before its first job. U
 
 ## Catalog monitoring
 
-The catalog queue contains 17 public top-level categories. Each category persists its next page, observed page size, last product signature, pages scanned, completed sweeps, and last status. The hourly scheduler processes three least-recently-crawled category pages by default.
+The catalog queue contains 17 public top-level categories. Each category persists its next page, observed page size, last product signature, pages scanned, completed sweeps, and last status. The hourly scheduler processes three least-recently-crawled category pages by default. Each page enriches at most two products with public detail and first-page review evidence.
 
 ```bash
 .venv/bin/python -m app.cli catalog-seed
@@ -99,3 +99,5 @@ curl http://127.0.0.1:8000/healthz
 ```
 
 The Settings panel shows scheduler state, failure count, circuit expiry, last backup, and last retention time.
+
+The web process and scheduler are independent. `open-panel` only starts the web process. Continuous monitoring requires the `schedule` command to remain running.

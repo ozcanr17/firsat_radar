@@ -89,10 +89,12 @@ class CatalogMonitor:
         session_factory: SessionFactory,
         crawler: TargetCrawler | None,
         products_per_page: int,
+        details_per_page: int = 0,
     ) -> None:
         self.session_factory = session_factory
         self.crawler = crawler
         self.products_per_page = products_per_page
+        self.details_per_page = details_per_page
 
     def seed(self) -> int:
         created = 0
@@ -154,7 +156,10 @@ class CatalogMonitor:
         summary = await self.crawler.crawl_target(
             target_url,
             category.name,
-            CrawlLimits(products=self.products_per_page),
+            CrawlLimits(
+                products=self.products_per_page,
+                details=self.details_per_page,
+            ),
         )
         self._advance(category.id, page, summary)
         return summary

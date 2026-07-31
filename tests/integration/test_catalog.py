@@ -57,7 +57,7 @@ async def test_catalog_seeds_and_rotates_categories(settings: Settings) -> None:
     engine = build_engine(settings)
     session_factory = build_session_factory(engine)
     crawler = FakeTargetCrawler([summary(1), summary(2)])
-    monitor = CatalogMonitor(session_factory, crawler, 60)
+    monitor = CatalogMonitor(session_factory, crawler, 60, 2)
     try:
         assert monitor.seed() == len(MAIN_CATEGORIES)
         assert monitor.seed() == 0
@@ -68,6 +68,7 @@ async def test_catalog_seeds_and_rotates_categories(settings: Settings) -> None:
         assert result.products_seen == 120
         assert len(crawler.targets) == 2
         assert crawler.targets[0][1] != crawler.targets[1][1]
+        assert crawler.targets[0][2].details == 2
         assert status.category_count == len(MAIN_CATEGORIES)
         assert status.pages_scanned == 2
         assert status.pending_count == len(MAIN_CATEGORIES)
@@ -86,7 +87,7 @@ async def test_catalog_completes_short_category_page(settings: Settings) -> None
             summary(2, products_seen=12, signature="b" * 64),
         ]
     )
-    monitor = CatalogMonitor(session_factory, crawler, 60)
+    monitor = CatalogMonitor(session_factory, crawler, 60, 2)
     try:
         monitor.seed()
         await monitor.run_next()

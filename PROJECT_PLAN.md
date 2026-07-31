@@ -54,8 +54,14 @@ Status: Complete.
 
 Add persistent category cursors, bounded round-robin page traversal, repeated-page detection, catalog progress reporting, scheduler integration, and operational commands.
 
-## Stage 9: Product freshness and detail queue
+## Stage 9: Search and commercial decision support
+
+Status: Complete.
+
+Add product/category search, category and route filters, evidence-gated commercial recommendations, bounded detail/review collection, and starvation-free analysis prioritization.
+
+## Stage 10: Custom watchlists and product freshness
 
 Status: Ready.
 
-Prioritize stale and high-signal products for detail and public-review refresh without coupling expensive detail navigation to broad catalog discovery.
+Allow operator-defined product/category watch targets and prioritize stale, changed, high-signal products for recurring detail and public-review refresh.

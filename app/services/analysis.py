@@ -25,11 +25,24 @@ class AnalysisService:
     def __init__(self, session_factory: SessionFactory) -> None:
         self.session_factory = session_factory
 
-    def analyze(self, limit: int = 60) -> AnalysisSummary:
-        if not 1 <= limit <= 60:
-            raise ValueError("Analysis limit must be between 1 and 60")
+    def analyze(self, limit: int = 200) -> AnalysisSummary:
+        if not 1 <= limit <= 500:
+            raise ValueError("Analysis limit must be between 1 and 500")
         with self.session_factory.begin() as session:
-            products = session.scalars(select(Product).order_by(Product.id).limit(limit)).all()
+            current_analysis_exists = (
+                select(AnalysisModel.id)
+                .where(
+                    AnalysisModel.product_id == Product.id,
+                    AnalysisModel.fetch_id == Product.last_fetch_id,
+                    AnalysisModel.model_version == MODEL_VERSION,
+                )
+                .exists()
+            )
+            products = session.scalars(
+                select(Product)
+                .order_by(current_analysis_exists, Product.last_seen_at.desc(), Product.id)
+                .limit(limit)
+            ).all()
             inputs = []
             labels_created = 0
             labels_updated = 0

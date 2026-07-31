@@ -35,7 +35,7 @@ class CatalogOperation(Protocol):
 
 
 class AnalysisOperation(Protocol):
-    def analyze(self, limit: int = 60) -> AnalysisSummary: ...
+    def analyze(self, limit: int = 200) -> AnalysisSummary: ...
 
 
 class BackupOperation(Protocol):

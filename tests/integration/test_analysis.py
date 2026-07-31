@@ -129,9 +129,10 @@ async def test_analysis_is_traceable_and_idempotent(settings: Settings) -> None:
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/api/v1/opportunities")
         dashboard = await client.get("/")
-        products_page = await client.get("/products")
+        products_page = await client.get("/products", params={"q": "Gerçek", "sort": "reviews"})
         product_page = await client.get(f"/products/{product.id}")
         opportunities_page = await client.get("/opportunities")
+        recommendations_page = await client.get("/recommendations")
         runs_page = await client.get("/runs")
         settings_page = await client.get("/settings")
         products_csv = await client.get("/exports/products.csv")
@@ -153,8 +154,11 @@ async def test_analysis_is_traceable_and_idempotent(settings: Settings) -> None:
     assert response.json()["items"][0]["source_url"] == detail_fetch.url
     assert "Öne çıkan fırsatlar" in dashboard.text
     assert "Gerçek Ürün" in products_page.text
+    assert "Ürün veya marka ara" in products_page.text
     assert "Fırsat kanıtı" in product_page.text
     assert "Fırsat radarları" in opportunities_page.text
+    assert "Kanıttan aksiyona" in recommendations_page.text
+    assert "Al-sat adayı" in recommendations_page.text
     assert "Tarama geçmişi" in runs_page.text
     assert "Katalog kapsamı" in settings_page.text
     assert products_csv.status_code == 200

@@ -25,11 +25,12 @@ class Settings(BaseSettings):
     crawl_max_details: int = Field(default=20, ge=0, le=20)
     robots_cache_hours: int = Field(default=24, ge=1, le=24)
     scheduler_interval_hours: int = Field(default=1, ge=1, le=168)
-    scheduler_products: int = Field(default=20, ge=1, le=60)
+    scheduler_products: int = Field(default=200, ge=1, le=500)
     scheduler_details: int = Field(default=5, ge=0, le=20)
     catalog_enabled: bool = True
     catalog_pages_per_run: int = Field(default=3, ge=1, le=10)
     catalog_products_per_page: int = Field(default=60, ge=1, le=60)
+    catalog_details_per_page: int = Field(default=2, ge=0, le=5)
     retry_attempts: int = Field(default=2, ge=1, le=3)
     retry_delay_seconds: float = Field(default=30.0, ge=5.0, le=300.0)
     circuit_failure_threshold: int = Field(default=3, ge=1, le=5)

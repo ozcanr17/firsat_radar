@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Ticari Öneriler · {{ app_name }}{% endblock %}
+
+{% block content %}
+<section class="page-heading split-heading">
+    <div><span class="section-tag">KARAR DESTEK RADARI</span><h1>Kanıttan aksiyona</h1><p>Al-sat, yerel üretim ve izleme seçeneklerini kanıt, risk ve doğrulama adımlarıyla birlikte değerlendir.</p></div>
+    <div class="count-tile"><strong>{{ recommendations|length }}</strong><span>filtrelenmiş öneri</span></div>
+</section>
+
+<div class="route-summary-grid">
+    {% for route, label in route_labels.items() %}
+    <a class="route-summary route-{{ route }} {{ 'active' if selected_route == route else '' }}" href="{{ url_for('recommendations_page') }}?route={{ route }}{% if selected_category %}&category={{ selected_category|urlencode }}{% endif %}"><strong>{{ route_counts.get(route, 0) }}</strong><span>{{ label }}</span></a>
+    {% endfor %}
+</div>
+
+<form class="recommendation-filter" method="get" action="{{ url_for('recommendations_page') }}">
+    <label class="search-field"><span>Ticari rota</span><select name="route"><option value="">Tüm rotalar</option>{% for route, label in route_labels.items() %}<option value="{{ route }}" {{ 'selected' if route == selected_route else '' }}>{{ label }}</option>{% endfor %}</select></label>
+    <label class="search-field"><span>Kategori</span><select name="category"><option value="">Tüm kategoriler</option>{% for category in categories %}<option value="{{ category }}" {{ 'selected' if category == selected_category else '' }}>{{ category }}</option>{% endfor %}</select></label>
+    <button class="search-submit" type="submit">Uygula</button>
+    {% if selected_route or selected_category %}<a class="search-clear" href="{{ url_for('recommendations_page') }}">Temizle</a>{% endif %}
+</form>
+
+{% if recommendations %}
+<div class="recommendation-list">
+    {% for item in recommendations %}
+    <article class="recommendation-card route-{{ item.route }}">
+        <div class="recommendation-score"><span>Hazırlık</span><strong>{{ "%.0f"|format(item.readiness) }}</strong><small>%{{ "%.0f"|format(item.confidence * 100) }} kanıt güveni</small></div>
+        <div class="recommendation-body">
+            <div class="opportunity-topline"><span class="route-badge">{{ item.route_label }}</span><span class="confidence">{{ item.category or 'Kategori yok' }}</span></div>
+            <h2><a href="{{ url_for('product_page', product_id=item.product_id) }}">{{ item.title }}</a></h2>
+            <p>{{ item.summary }}</p>
+            <div class="decision-grid">
+                <div><h3>Kanıt</h3><ul>{% for evidence in item.evidence %}<li>{{ evidence }}</li>{% endfor %}</ul></div>
+                <div><h3>Risk</h3><ul>{% for risk in item.risks %}<li>{{ risk }}</li>{% endfor %}</ul></div>
+                <div><h3>Sonraki doğrulama</h3><ol>{% for step in item.validation_steps %}<li>{{ step }}</li>{% endfor %}</ol></div>
+            </div>
+        </div>
+        <div class="recommendation-actions"><span>{{ "{:,.2f}".format(item.price).replace(',', 'X').replace('.', ',').replace('X', '.') if item.price is not none else '—' }} TL</span><a href="{{ item.source_url }}" target="_blank" rel="noreferrer">Kaynak ↗</a></div>
+    </article>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-panel"><span>◇</span><h3>Bu filtrede öneri yok</h3><p>Önce daha fazla ürün verisi topla veya filtreleri temizle.</p></div>
+{% endif %}
+
+<section class="decision-disclaimer"><strong>Karar sınırı</strong><p>Bu öneriler pazar sinyali ve araştırma önceliğidir. Kâr, satış veya üretim başarısı garantisi değildir; sermaye bağlamadan önce maliyet, vergi, mevzuat, tedarik ve talep testi gerekir.</p></section>
+{% endblock %}

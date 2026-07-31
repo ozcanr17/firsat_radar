@@ -48,6 +48,7 @@ def build_scheduled_pipeline(settings: Settings) -> tuple[ScheduledPipeline, Eng
         session_factory,
         crawler,
         settings.catalog_products_per_page,
+        settings.catalog_details_per_page,
     )
     pipeline = ScheduledPipeline(
         settings=settings,
@@ -144,7 +145,7 @@ def crawl(
 
 @app.command()
 def analyze(
-    limit_products: int = typer.Option(60, min=1, max=60),
+    limit_products: int = typer.Option(200, min=1, max=500),
 ) -> None:
     settings = Settings()
     upgrade_database(settings)
@@ -166,6 +167,7 @@ def catalog_seed() -> None:
         service.session_factory,
         service,
         settings.catalog_products_per_page,
+        settings.catalog_details_per_page,
     )
     try:
         created = monitor.seed()
@@ -183,6 +185,7 @@ def catalog_status() -> None:
         service.session_factory,
         service,
         settings.catalog_products_per_page,
+        settings.catalog_details_per_page,
     )
     try:
         typer.echo(json.dumps(asdict(monitor.status()), ensure_ascii=False, default=str))
@@ -201,6 +204,7 @@ def catalog_run(
         service.session_factory,
         service,
         settings.catalog_products_per_page,
+        settings.catalog_details_per_page,
     )
     try:
         summary = asyncio.run(monitor.run_batch(pages))
@@ -224,6 +228,7 @@ def catalog_reset(
         service.session_factory,
         service,
         settings.catalog_products_per_page,
+        settings.catalog_details_per_page,
     )
     try:
         typer.echo(json.dumps({"reset": monitor.reset_progress()}))

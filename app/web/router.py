@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 
@@ -14,7 +14,8 @@ from app.services.catalog import CatalogMonitor
 from app.services.dashboard import get_dashboard_stats
 from app.services.opportunities import OpportunityView, list_latest_opportunities
 from app.services.product_detail import get_product_page
-from app.services.products import ProductView, list_latest_products
+from app.services.products import ProductView, list_latest_products, search_products
+from app.services.recommendations import ROUTE_LABELS, build_recommendations
 from app.services.runs import list_runs
 from app.services.runtime_state import RuntimeStateService
 
@@ -102,10 +103,24 @@ def create_web_router(settings: Settings, session_factory: SessionFactory) -> AP
         return templates.TemplateResponse(request=request, name="dashboard.html", context=context)
 
     @router.get("/products", response_class=HTMLResponse, name="products_page")
-    def products_page(request: Request) -> HTMLResponse:
-        products = list_latest_products(session_factory)
+    def products_page(
+        request: Request,
+        q: str = Query(default="", max_length=120),
+        category: str = Query(default="", max_length=255),
+        sort: str = Query(default="rank", max_length=30),
+    ) -> HTMLResponse:
+        result = search_products(session_factory, q, category, sort)
         context = shared_context(request, "products")
-        context.update({"products": products})
+        context.update(
+            {
+                "products": result.items,
+                "product_total": result.total,
+                "categories": result.categories,
+                "search_query": q,
+                "selected_category": category,
+                "selected_sort": sort,
+            }
+        )
         return templates.TemplateResponse(request=request, name="products.html", context=context)
 
     @router.get("/products/{product_id}", response_class=HTMLResponse, name="product_page")
@@ -132,6 +147,30 @@ def create_web_router(settings: Settings, session_factory: SessionFactory) -> AP
             context=context,
         )
 
+    @router.get("/recommendations", response_class=HTMLResponse, name="recommendations_page")
+    def recommendations_page(
+        request: Request,
+        route: str = Query(default="", max_length=40),
+        category: str = Query(default="", max_length=255),
+    ) -> HTMLResponse:
+        result = build_recommendations(session_factory, route, category)
+        context = shared_context(request, "recommendations")
+        context.update(
+            {
+                "recommendations": result.items,
+                "route_counts": result.route_counts,
+                "route_labels": ROUTE_LABELS,
+                "categories": result.categories,
+                "selected_route": route,
+                "selected_category": category,
+            }
+        )
+        return templates.TemplateResponse(
+            request=request,
+            name="recommendations.html",
+            context=context,
+        )
+
     @router.get("/runs", response_class=HTMLResponse, name="runs_page")
     def runs_page(request: Request) -> HTMLResponse:
         context = shared_context(request, "runs")
@@ -140,7 +179,12 @@ def create_web_router(settings: Settings, session_factory: SessionFactory) -> AP
 
     @router.get("/settings", response_class=HTMLResponse, name="settings_page")
     def settings_page(request: Request) -> HTMLResponse:
-        catalog = CatalogMonitor(session_factory, None, settings.catalog_products_per_page)
+        catalog = CatalogMonitor(
+            session_factory,
+            None,
+            settings.catalog_products_per_page,
+            settings.catalog_details_per_page,
+        )
         context = shared_context(request, "settings")
         context.update(
             {
@@ -159,7 +203,8 @@ def create_web_router(settings: Settings, session_factory: SessionFactory) -> AP
                     ("Zamanlama aralığı", f"{settings.scheduler_interval_hours} saat"),
                     (
                         "Katalog taraması",
-                        f"Çalışma başına {settings.catalog_pages_per_run} kategori sayfası",
+                        f"Çalışma başına {settings.catalog_pages_per_run} sayfa / "
+                        f"sayfa başına {settings.catalog_details_per_page} detay",
                     ),
                     (
                         "Zamanlı kapsam",
