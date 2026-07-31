@@ -2,40 +2,48 @@
 
 ## Current stage
 
-Stage 0: Data-access discovery
+Stage 1: Skeleton and database
 
 Status: Complete
 
-Decision: `GO`
-
 ## Completed
 
-- Preserved the direct HTTP block evidence in ADR 0001.
-- Verified the Hepsiburada homepage in a normal rendered browser.
-- Used the visible site search to load a live `bebek arabası` listing.
-- Confirmed live product cards expose title, URL, price, rating, evaluation count, and position.
-- Opened one canonical product page and confirmed product attributes and provenance fields.
-- Opened its public `-yorumlari` page and confirmed visible review text, dates, aggregate rating, distribution, and pagination.
-- Confirmed that restricted `/api/` and `/product-comment/` endpoints are unnecessary.
-- Recorded the browser-adapter decision in ADR 0002.
+- Added a Python 3.12 package with pinned runtime and development dependencies.
+- Generated a fully resolved `requirements.lock`.
+- Added environment-based configuration and managed local data directories.
+- Added the complete initial SQLite schema for sources, crawl runs, fetch provenance, products, snapshots, offers, reviews, labels, analyses, opportunities, and settings.
+- Added Alembic migration `20260731_0001`.
+- Added `init-db`, `doctor`, and `serve` CLI commands.
+- Added `/healthz` with database readiness and latest-run state.
+- Added a server-rendered dashboard shell with an explicit `NO_DATA` state.
+- Added unit and integration tests.
+- Preserved the no-demo-data rule.
 
-## Verified sample
+## Verification
 
-- Search: `bebek arabası`
-- Listing result: more than 10,000 products reported by the page
-- Sample product: `Karf Momsafe Hamile Emniyet Kemeri Aparatı`
-- Sample rating: 4.8
-- Sample evaluation count: 115
-- Visible reviews on first review page: 10
-- Restricted endpoint calls: 0
-- CAPTCHA or bypass attempts: 0
+- Ruff lint: passed
+- Ruff format check: passed
+- Mypy strict mode: passed
+- Pytest: 5 passed
+- Initial migration: passed on a clean temporary SQLite database
+- CLI doctor: `status=ok`, `migration_ready=true`
+- Git worktree before commit: reviewed with no unrelated changes
 
-The sample values are discovery evidence only. They will not be shipped as seed or demo data.
+## Current commands
 
-## Implementation decision
+```bash
+.venv/bin/python -m app.cli init-db
+.venv/bin/python -m app.cli doctor
+.venv/bin/python -m app.cli serve
+```
 
-Build a headed Playwright adapter that reads only rendered public DOM content. Keep concurrency at one, apply 6-12 second delays, use strict crawl limits, discard reviewer identity, and stop immediately on any access block.
+## Known limits
+
+- The browser adapter is not implemented yet.
+- No live product data has been persisted.
+- The dashboard intentionally shows `NO_DATA`.
+- Scheduling and analysis remain inactive.
 
 ## Next stage
 
-Stage 1 is ready: create the Python project skeleton, configuration, database migration, CLI, health endpoint, and basic web shell.
+Stage 2 is ready: implement the policy gate, headed browser listing discovery, normalization, provenance, idempotent product upsert, and product snapshots.

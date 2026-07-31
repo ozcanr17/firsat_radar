@@ -8,13 +8,13 @@ Validate the live robots policy, listing access, available fields, canonical pro
 
 ## Stage 1: Skeleton and database
 
-Status: Ready.
+Status: Complete.
 
 Create the Python project, configuration, migrations, CLI, health endpoint, and basic web shell.
 
 ## Stage 2: Live listing slice
 
-Status: Pending.
+Status: Ready.
 
 Implement policy gate, live listing discovery, normalization, provenance, snapshots, and idempotent persistence.
 
