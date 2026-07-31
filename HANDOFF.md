@@ -2,84 +2,74 @@
 
 ## Current stage
 
-Stage 12: Cloud control plane and multi-market foundation
+Stage 13: Unified Radar Center and continuous discovery
 
 Status: Complete
 
-Release: 1.5.2
+Release: 1.6.0
 
 ## Delivered
 
-- Added a production Docker image with Playwright Chromium.
-- Added Railway configuration for GitHub deployments, health checks, one replica, and a persistent `/data` volume.
-- Added automatic migrations and an optional embedded hourly scheduler to the FastAPI lifecycle.
-- Added password protection for every panel and API route except `/healthz` and static assets.
-- Added `/marketplaces` as the marketplace connection control center.
-- Registered Hepsiburada, Amazon Türkiye, Trendyol, and MediaMarkt Türkiye with explicit collection modes and access states.
-- Added `/api/v1/marketplaces` for connector visibility.
-- Extended watch targets with a marketplace source and safe per-domain URL normalization.
-- Allowed the Esnaf Masası to record products or categories from all registered marketplaces.
-- Added schema migration `20260731_0009`.
-- Removed the Anne & Bebek-only restriction from product selection in the Esnaf Masası.
-- Added the Railway environment template and cloud deployment guide.
-- Added a Railway volume entrypoint that repairs mounted `/data` ownership before dropping privileges to the `radar` user.
-- Fixed production styling by serving the stylesheet from a relative path and trusting Railway proxy headers.
+- Rebuilt `/` as the single operational Radar Center.
+- Added live agent, queue, category coverage, product, opportunity, and run visibility to one page.
+- Added **Şimdi tara** for an authenticated, non-overlapping background cycle.
+- Added quick Hepsiburada product and category target registration.
+- Added eight prioritized popular-category cards with enable and disable controls.
+- Added `/api/v1/radar`, `/api/v1/radar/run`, category state, and circuit reset endpoints.
+- Enabled the 17-category round-robin catalog by default.
+- Changed the scheduler to start immediately and then repeat hourly.
+- Changed each cycle to process both due watch targets and category discovery.
+- Added direct discovery for unresolved Hepsiburada product URLs.
+- Linked newly discovered products back to their watch targets.
+- Added bounded category target discovery.
+- Added structured product-page price, rating, review-count, and image extraction.
+- Added a new product snapshot on every tracked product refresh.
+- Preserved the previous listing values when product structured data omits a field.
+- Kept analysis, retention, backup, non-overlap, circuit breaker, quota, and policy gates in the same cycle.
 
-## Cloud operating model
+## Operating model
 
-1. Railway builds the repository Dockerfile whenever `main` changes.
-2. The FastAPI panel migrates the database and starts behind a required administrator password.
-3. A single embedded scheduler prioritizes due watch targets every hour.
-4. Runtime data, evidence, watch targets, and business cases persist on `/data`.
-5. GitHub Pages remains the public read-only snapshot; the Railway URL is the private operational panel.
-6. The service must remain at one replica while SQLite and the embedded scheduler share a volume.
+1. Railway starts the authenticated FastAPI service and migrates the persistent database.
+2. The embedded scheduler queues an immediate guarded cycle, then runs hourly.
+3. Up to three due watch targets are discovered or refreshed.
+4. Three pages from prioritized category agents are scanned in round-robin order.
+5. Visible product facts and reviews are persisted as evidence.
+6. Opportunity and review analysis runs after collection.
+7. The Radar Center shows the new state and allows an additional manual cycle.
 
-The Railway production service is active at `https://firsatradar-production.up.railway.app/`. Its `/data` volume is attached, the administrator credentials are stored in Railway variables, and `PORT=6767` matches the generated public-domain target port.
+The unified control page is `https://firsatradar-production.up.railway.app/`. Detailed pages remain available for products, opportunities, recommendations, profitability, marketplaces, runs, and settings.
 
-## Marketplace access
+## Access boundary
 
-- Hepsiburada: existing visible-browser collector, policy gate, bounded rate, and stop conditions.
-- Amazon Türkiye: connector contract is identified as Creators API; credentials and account eligibility are required.
-- Trendyol: official Marketplace Partner API manages seller operations and is not treated as an unrestricted full-market catalog API; an approved catalog or affiliate feed is required.
-- MediaMarkt Türkiye: an approved catalog or affiliate feed is required before automated collection is marked active.
-
-Targets can already be registered for every marketplace. Unsupported sources remain visibly blocked and are not silently crawled.
-
-## Delivery
-
-- Public snapshot: `https://ozcanr17.github.io/firsat_radar/`
-- Repository: `https://github.com/ozcanr17/firsat_radar`
-- Cloud panel: `https://firsatradar-production.up.railway.app/`
-- Cloud instructions: `docs/CLOUD_DEPLOYMENT.md`
-- Cloud configuration: `railway.toml`, `Dockerfile`, `.env.railway.example`
-
-Runtime SQLite, marketplace credentials, watch targets, business cases, policy files, cached pages, and raw review evidence remain outside Git under `data/` or cloud secrets.
+- Hepsiburada uses public rendered pages without private APIs.
+- Public visibility is not interpreted as unrestricted permission.
+- Every navigation is checked against cached source policy.
+- Requests remain sequential with a 6–12 second interval and an 800 request daily cap.
+- The collector stops on policy denial, HTTP 403, HTTP 429, CAPTCHA, security pages, and parser drift.
+- No proxy rotation, hidden API, authentication bypass, CAPTCHA bypass, or access-control bypass is implemented.
+- Amazon Türkiye, Trendyol, and MediaMarkt remain inactive until official credentials or approved feeds are connected.
 
 ## Verification
 
 - Ruff lint passed.
-- Ruff format check passed.
+- Ruff format passed.
 - Mypy strict mode passed.
-- Pytest passed: 48 tests.
-- Production Docker image built successfully.
-- Container `/healthz` returned HTTP 200.
-- Container `/marketplaces` returned HTTP 401 without credentials and HTTP 200 with valid credentials.
-- Railway production deployment `7dd3fa22` became active.
-- Public Railway `/healthz` returned HTTP 200 with database status `ok`.
-- Public Railway `/` returned HTTP 401 with the `PazarRadar` Basic Auth challenge.
-- The persistent Railway volume mounted successfully and all nine database migrations ran.
-- Production dashboard markup now uses `/static/styles.css` without mixed-content risk.
-- No external product page was requested during this stage.
+- Pytest passed: 52 tests.
+- Desktop Radar Center layout was visually verified in the in-app browser.
+- Mobile Radar Center layout was visually verified at 390 × 844.
+- Product URL discovery and watch-target linking are covered by integration tests.
+- Watchlist and catalog execution in the same scheduler cycle are covered by integration tests.
+- Radar status and category management APIs are covered by integration tests.
 
-## Safety contract
+## Delivery
 
-- One browser connection with 6–12 seconds between external requests.
-- Hard limit of 800 requests per UTC day.
-- No hidden API, query-pagination abuse, proxy rotation, CAPTCHA bypass, or access-control bypass.
-- Stop on policy denial, HTTP 403, HTTP 429, CAPTCHA, security page, or parser drift.
-- Credentials stay in cloud secrets and never enter Git.
-- Market scores and profitability calculations remain validation aids, not guarantees.
+- Repository: `https://github.com/ozcanr17/firsat_radar`
+- Cloud panel: `https://firsatradar-production.up.railway.app/`
+- Public snapshot: `https://ozcanr17.github.io/firsat_radar/`
+- Cloud guide: `docs/CLOUD_DEPLOYMENT.md`
+
+Runtime databases, raw evidence, browser state, credentials, watch targets, and business cases remain outside Git.
 
 ## Next stage
 
-Stage 13 connects official or approved marketplace data sources. Amazon requires Creators API credentials. Trendyol and MediaMarkt require approved catalog or affiliate feeds. After the first second-market source is active, add cross-market product matching, price dispersion, category briefs, and opportunity ranking across sources.
+Stage 14 should add durable notification channels, cross-market product identity, official Amazon Creators API ingestion, approved Trendyol and MediaMarkt feeds, category-level trend briefs, and acquisition or local-production validation workflows.

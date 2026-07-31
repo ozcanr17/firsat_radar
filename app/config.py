@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     watchlist_enabled: bool = True
     watchlist_targets_per_run: int = Field(default=3, ge=1, le=10)
     embedded_scheduler_enabled: bool = False
-    catalog_enabled: bool = False
+    catalog_enabled: bool = True
     catalog_pages_per_run: int = Field(default=3, ge=1, le=10)
     catalog_products_per_page: int = Field(default=60, ge=1, le=60)
     catalog_details_per_page: int = Field(default=2, ge=0, le=5)

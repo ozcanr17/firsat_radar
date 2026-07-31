@@ -29,6 +29,20 @@ class CatalogStatus:
     last_crawled_at: datetime | None
 
 
+@dataclass(frozen=True)
+class CategoryView:
+    id: int
+    name: str
+    url: str
+    enabled: bool
+    priority: int
+    next_page: int
+    pages_scanned: int
+    sweeps_completed: int
+    last_status: str
+    last_crawled_at: datetime | None
+
+
 class TargetCrawler(Protocol):
     async def crawl_target(
         self,
@@ -82,6 +96,17 @@ MAIN_CATEGORIES = (
     CategorySeed("Akıllı Ev, Yaşam", "https://www.hepsiburada.com/akilli-ev-yasam-c-80079038"),
 )
 
+POPULAR_CATEGORY_PRIORITIES = {
+    "Bilgisayar, Tablet": 1000,
+    "Telefon": 950,
+    "Ev Elektroniği": 900,
+    "Beyaz Eşya, Mutfak": 850,
+    "Anne, Bebek, Oyuncak": 800,
+    "Kozmetik, Kişisel Bakım": 750,
+    "Süpermarket": 700,
+    "Spor, Outdoor": 650,
+}
+
 
 class CatalogMonitor:
     def __init__(
@@ -110,6 +135,7 @@ class CatalogMonitor:
                 session.add(source)
                 session.flush()
             for seed in MAIN_CATEGORIES:
+                priority = POPULAR_CATEGORY_PRIORITIES.get(seed.name, 500)
                 existing = session.scalar(
                     select(CategoryCursor).where(
                         CategoryCursor.source_id == source.id,
@@ -118,6 +144,7 @@ class CatalogMonitor:
                 )
                 if existing is not None:
                     existing.name = seed.name
+                    existing.priority = priority
                     continue
                 session.add(
                     CategoryCursor(
@@ -125,7 +152,7 @@ class CatalogMonitor:
                         name=seed.name,
                         url=seed.url,
                         enabled=True,
-                        priority=100,
+                        priority=priority,
                         next_page=1,
                         pages_scanned=0,
                         sweeps_completed=0,
@@ -135,8 +162,56 @@ class CatalogMonitor:
                 created += 1
         return created
 
+    def categories(self) -> list[CategoryView]:
+        self.seed()
+        with self.session_factory() as session:
+            rows = session.scalars(
+                select(CategoryCursor).order_by(
+                    CategoryCursor.priority.desc(),
+                    CategoryCursor.name,
+                )
+            ).all()
+        return [
+            CategoryView(
+                id=row.id,
+                name=row.name,
+                url=row.url,
+                enabled=row.enabled,
+                priority=row.priority,
+                next_page=row.next_page,
+                pages_scanned=row.pages_scanned,
+                sweeps_completed=row.sweeps_completed,
+                last_status=row.last_status,
+                last_crawled_at=row.last_crawled_at,
+            )
+            for row in rows
+        ]
+
+    def set_enabled(self, category_id: int, enabled: bool) -> CategoryView | None:
+        self.seed()
+        with self.session_factory.begin() as session:
+            category = session.get(CategoryCursor, category_id)
+            if category is None:
+                return None
+            category.enabled = enabled
+        return next(item for item in self.categories() if item.id == category_id)
+
     async def run_batch(self, page_count: int) -> CrawlSummary:
         self.seed()
+        if self.status().enabled_count == 0:
+            return CrawlSummary(
+                run_id=0,
+                status=RunStatus.UNCHANGED,
+                products_seen=0,
+                products_created=0,
+                products_updated=0,
+                snapshots_created=0,
+                details_created=0,
+                reviews_created=0,
+                fetches_created=0,
+                error_code=None,
+                listing_signature=None,
+            )
         summaries: list[CrawlSummary] = []
         for _ in range(page_count):
             summary = await self.run_next()

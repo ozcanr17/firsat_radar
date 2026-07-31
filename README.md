@@ -14,7 +14,7 @@ The repository contains a production Docker image, Railway configuration, automa
 
 Production domain: [firsatradar-production.up.railway.app](https://firsatradar-production.up.railway.app/)
 
-The cloud panel pages include `/marketplaces`, where Hepsiburada, Amazon Türkiye, Trendyol, and MediaMarkt Türkiye connections show their actual access state. Marketplace credentials and feed agreements are stored only as cloud secrets; they are never committed to GitHub.
+The cloud panel opens on the unified Radar Center. It starts a guarded scan, registers product or category targets, shows the live agent state, manages popular category agents, and links to products, opportunities, recommendations, profitability, marketplaces, runs, and settings. Marketplace credentials and feed agreements are stored only as cloud secrets; they are never committed to GitHub.
 
 ## Requirements
 
@@ -55,7 +55,9 @@ Always check policy before a bounded collection:
 
 Collection is visible, single-tab, sequential, delayed by 6–12 seconds, and capped at 800 external requests per UTC day. It stops on policy denial, HTTP 403, HTTP 429, CAPTCHA, security pages, or parser drift. It does not use query pagination, hidden APIs, `/product-comment/`, separate review-page navigation, proxy rotation, or bypass behavior. Review evidence is extracted only when already visible on the opened product page.
 
-The hourly scheduler prioritizes up to three due products from the watchlist. In cloud mode it starts inside the single web service. Unresolved Hepsiburada URLs wait for permitted discovery. Other marketplaces wait until their official API credentials or approved feeds are connected.
+The hourly scheduler starts its first cycle when the cloud service boots. Every cycle processes up to three due watch targets, rotates through three category pages, analyzes collected evidence, applies retention, and records operational state. A new Hepsiburada product URL is opened directly, converted into a tracked product, and linked to its watch target. Category targets enter the same bounded discovery flow. Other marketplaces wait until their official API credentials or approved feeds are connected.
+
+The collector uses only publicly rendered pages that pass the source policy gate. Public visibility does not remove a marketplace's terms, robots rules, or technical access controls. The system never promises permission-free access and stops instead of bypassing a restriction.
 
 ## GitHub Actions
 

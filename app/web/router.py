@@ -93,6 +93,13 @@ def create_web_router(settings: Settings, session_factory: SessionFactory) -> AP
     def dashboard(request: Request) -> HTMLResponse:
         products = list_latest_products(session_factory, 6)
         opportunities = list_latest_opportunities(session_factory, 5)
+        catalog = CatalogMonitor(
+            session_factory,
+            None,
+            settings.catalog_products_per_page,
+            settings.catalog_details_per_page,
+        )
+        targets = list_watch_targets(session_factory)
         context = shared_context(request, "dashboard")
         context.update(
             {
@@ -100,6 +107,14 @@ def create_web_router(settings: Settings, session_factory: SessionFactory) -> AP
                 "data_state": "LIVE_DATA" if products else "NO_DATA",
                 "products": products,
                 "opportunities": opportunities,
+                "runtime": RuntimeStateService(session_factory).get(),
+                "catalog": catalog.status(),
+                "categories": catalog.categories(),
+                "targets": targets,
+                "due_target_count": sum(item.refresh_due for item in targets),
+                "scheduler_enabled": settings.embedded_scheduler_enabled,
+                "catalog_enabled": settings.catalog_enabled,
+                "scheduler_interval_hours": settings.scheduler_interval_hours,
             }
         )
         return templates.TemplateResponse(request=request, name="dashboard.html", context=context)
@@ -243,8 +258,8 @@ def create_web_router(settings: Settings, session_factory: SessionFactory) -> AP
                         ),
                     ),
                     (
-                        "Eski katalog taraması",
-                        "Kapalı" if not settings.catalog_enabled else "Elle etkinleştirilmiş",
+                        "Kategori ajanları",
+                        "Kapalı" if not settings.catalog_enabled else "Sürekli rotasyon açık",
                     ),
                     (
                         "Zamanlı kapsam",

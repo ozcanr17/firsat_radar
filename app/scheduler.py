@@ -252,15 +252,20 @@ class ScheduledPipeline:
         )
         for attempt in range(1, self.settings.retry_attempts + 1):
             try:
+                summaries: list[CrawlSummary] = []
                 if self.settings.watchlist_enabled and self.watchlist is not None:
-                    summary = await self.watchlist.run_batch(
-                        self.settings.watchlist_targets_per_run
+                    summaries.append(
+                        await self.watchlist.run_batch(self.settings.watchlist_targets_per_run)
                     )
-                    return summary, attempt
+                    if summaries[-1].status not in SUCCESS_STATUSES:
+                        return summaries[-1], attempt
                 if self.settings.catalog_enabled and self.catalog is not None:
-                    summary = await self.catalog.run_batch(self.settings.catalog_pages_per_run)
-                    return summary, attempt
-                return await self.crawler.crawl(limits), attempt
+                    summaries.append(
+                        await self.catalog.run_batch(self.settings.catalog_pages_per_run)
+                    )
+                if not summaries or all(summary.run_id == 0 for summary in summaries):
+                    summaries.append(await self.crawler.crawl(limits))
+                return merge_crawl_summaries(summaries), attempt
             except Exception:
                 if attempt >= self.settings.retry_attempts:
                     raise
@@ -283,8 +288,41 @@ def build_scheduler(settings: Settings, pipeline: ScheduledPipeline) -> AsyncIOS
         coalesce=True,
         misfire_grace_time=300,
         replace_existing=True,
+        next_run_time=datetime.now(ZoneInfo(settings.timezone)),
     )
     return scheduler
+
+
+def merge_crawl_summaries(summaries: list[CrawlSummary]) -> CrawlSummary:
+    if not summaries:
+        raise ValueError("empty_crawl_summaries")
+    failure = next(
+        (summary for summary in summaries if summary.status not in SUCCESS_STATUSES),
+        None,
+    )
+    last = failure or summaries[-1]
+    status = (
+        last.status
+        if failure is not None
+        else (
+            RunStatus.COMPLETED
+            if any(summary.status is RunStatus.COMPLETED for summary in summaries)
+            else RunStatus.UNCHANGED
+        )
+    )
+    return CrawlSummary(
+        run_id=last.run_id,
+        status=status,
+        products_seen=sum(summary.products_seen for summary in summaries),
+        products_created=sum(summary.products_created for summary in summaries),
+        products_updated=sum(summary.products_updated for summary in summaries),
+        snapshots_created=sum(summary.snapshots_created for summary in summaries),
+        details_created=sum(summary.details_created for summary in summaries),
+        reviews_created=sum(summary.reviews_created for summary in summaries),
+        fetches_created=sum(summary.fetches_created for summary in summaries),
+        error_code=failure.error_code if failure is not None else None,
+        listing_signature=None,
+    )
 
 
 async def serve_scheduler(settings: Settings, pipeline: ScheduledPipeline) -> None:

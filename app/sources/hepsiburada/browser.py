@@ -3,6 +3,7 @@ import hashlib
 import json
 import random
 from datetime import UTC, datetime
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from types import TracebackType
 from typing import Any, Self, cast
@@ -199,13 +200,41 @@ class HepsiburadaBrowserAdapter:
                     const panelText = visible(panel) || "";
                     const marker = panelText.indexOf("Ürün özellikleri");
                     const description = marker >= 0 ? panelText.slice(0, marker) : panelText;
+                    const documents = Array.from(document.querySelectorAll(
+                        "script[type='application/ld+json']"
+                    )).flatMap(node => {
+                        try {
+                            const value = JSON.parse(node.textContent || "null");
+                            if (!value) return [];
+                            if (Array.isArray(value)) return value;
+                            return value["@graph"] || [value];
+                        } catch {
+                            return [];
+                        }
+                    });
+                    const product = documents.find(value => {
+                        const type = value && value["@type"];
+                        return type === "Product" || (
+                            Array.isArray(type) && type.includes("Product")
+                        );
+                    }) || {};
+                    const offers = Array.isArray(product.offers)
+                        ? product.offers[0]
+                        : product.offers || {};
+                    const rating = product.aggregateRating || {};
+                    const images = Array.isArray(product.image) ? product.image : [product.image];
                     return {
                         title: visible(heading) || "",
                         brand: visible(brandLink) || null,
                         seller: visible(sellerLink) || null,
                         reviewUrl: reviewLink ? reviewLink.href : null,
                         description,
-                        productInfoText: panelText
+                        productInfoText: panelText,
+                        price: offers.price || offers.lowPrice || null,
+                        oldPrice: offers.highPrice || null,
+                        rating: rating.ratingValue || null,
+                        reviewCount: rating.reviewCount || rating.ratingCount || null,
+                        imageUrl: images.find(Boolean) || null
                     };
                 }
                 """
@@ -266,6 +295,11 @@ class HepsiburadaBrowserAdapter:
             detail_document=detail_document,
             reviews=reviews,
             review_document=review_document,
+            price=parse_optional_decimal(detail_payload.get("price")),
+            old_price=parse_optional_decimal(detail_payload.get("oldPrice")),
+            rating=parse_optional_float(detail_payload.get("rating")),
+            review_count=parse_optional_int(detail_payload.get("reviewCount")),
+            image_url=str(detail_payload["imageUrl"]) if detail_payload.get("imageUrl") else None,
         )
 
     async def _collect_visible_reviews(
@@ -424,3 +458,29 @@ class DailyRequestQuota:
             json.dumps({"date": today, "count": count + 1}),
             encoding="utf-8",
         )
+
+
+def parse_optional_decimal(value: object) -> Decimal | None:
+    if value is None:
+        return None
+    try:
+        result = Decimal(str(value).replace(",", "."))
+    except InvalidOperation:
+        return None
+    return result if result >= 0 else None
+
+
+def parse_optional_float(value: object) -> float | None:
+    try:
+        result = float(str(value).replace(",", "."))
+    except (TypeError, ValueError):
+        return None
+    return result if 0 <= result <= 5 else None
+
+
+def parse_optional_int(value: object) -> int | None:
+    try:
+        result = int(str(value).replace(".", ""))
+    except (TypeError, ValueError):
+        return None
+    return result if result >= 0 else None

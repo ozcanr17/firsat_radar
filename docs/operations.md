@@ -9,25 +9,27 @@ Run the web panel and scheduler as separate local processes:
 .venv/bin/python -m app.cli schedule
 ```
 
-The interval scheduler waits for the configured interval before its first job. Use an explicit one-time run when an immediate policy-gated collection is intended:
+The interval scheduler starts one guarded cycle at service startup and repeats at the configured interval. Use an explicit one-time run when an additional immediate collection is intended:
 
 ```bash
 .venv/bin/python -m app.cli scheduled-run
 ```
 
+The same action is available from the Radar Center with **Şimdi tara**.
+
 ## Watchlist monitoring
 
-The local scheduler processes up to three due, resolved product targets per run. Priority combines the operator's priority, data age, opportunity score, and unresolved discovery state. Refreshes open only the known product page and classify only reviews already visible there.
+The scheduler processes up to three due targets per run. Priority combines the operator's priority, data age, opportunity score, and unresolved discovery state. New Hepsiburada product URLs are discovered from their public product page and linked to the target. Category targets scan their configured public category page. Refreshes classify only reviews already visible on the opened product page.
 
 ```bash
 .venv/bin/python -m app.cli watchlist-refresh --limit 3
 ```
 
-Product and category targets are managed from `/trade-desk`. A manually entered product URL that is not yet linked to a collected product remains unresolved until sitemap discovery can safely identify it.
+Product and category targets are managed from the Radar Center or `/trade-desk`.
 
-## Legacy catalog monitor
+## Category discovery agents
 
-The former 17-category query-pagination monitor is disabled by default and does not meet the current PazarRadar v2 contract. Its maintenance commands remain available for migration inspection only and must not be enabled for production collection.
+The category monitor is enabled by default. It rotates across 17 bounded Hepsiburada category cursors, prioritizing high-volume categories such as computers, phones, home electronics, appliances, baby products, cosmetics, supermarket, and sports. Three pages are processed per hourly cycle by default. Each category agent can be enabled or disabled from the Radar Center.
 
 ```bash
 .venv/bin/python -m app.cli catalog-status
@@ -100,4 +102,6 @@ curl http://127.0.0.1:8000/healthz
 
 The Settings panel shows scheduler state, failure count, circuit expiry, last backup, and last retention time.
 
-The web process and scheduler are independent. `open-panel` only starts the web process. Continuous local watchlist monitoring requires the `schedule` command to remain running. Hosted recurring collection remains disabled until sitemap XML acceptance succeeds.
+Local development can run the web process and scheduler separately. In Railway, the embedded scheduler runs inside the single authenticated web service and the `/data` volume stores its state. Keep the service at one replica.
+
+Collection remains bounded and policy-gated. Public page access is not treated as permission to bypass robots rules, authentication, CAPTCHA, HTTP 403/429 responses, or marketplace terms.

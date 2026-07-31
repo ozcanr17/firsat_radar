@@ -112,3 +112,27 @@ async def test_catalog_completes_short_category_page(settings: Settings) -> None
         assert category.last_crawled_at is not None
     finally:
         engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_catalog_returns_unchanged_when_all_categories_are_disabled(
+    settings: Settings,
+) -> None:
+    upgrade_database(settings)
+    engine = build_engine(settings)
+    session_factory = build_session_factory(engine)
+    crawler = FakeTargetCrawler([])
+    monitor = CatalogMonitor(session_factory, crawler, 60, 2)
+    try:
+        monitor.seed()
+        with session_factory.begin() as session:
+            for category in session.scalars(select(CategoryCursor)).all():
+                category.enabled = False
+
+        result = await monitor.run_batch(3)
+
+        assert result.status is RunStatus.UNCHANGED
+        assert result.run_id == 0
+        assert crawler.targets == []
+    finally:
+        engine.dispose()

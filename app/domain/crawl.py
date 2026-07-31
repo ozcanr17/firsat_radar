@@ -122,6 +122,11 @@ class ProductDetailResult:
     detail_document: FetchedDocument
     reviews: tuple[ReviewStub, ...]
     review_document: FetchedDocument | None
+    price: Decimal | None = None
+    old_price: Decimal | None = None
+    rating: float | None = None
+    review_count: int | None = None
+    image_url: str | None = None
 
 
 @dataclass(frozen=True)

@@ -35,6 +35,8 @@ async def test_dashboard_has_explicit_empty_state(client: AsyncClient) -> None:
     assert "NO_DATA" in response.text
     assert "örnek veya sahte pazar verisi göstermez" in response.text
     assert 'href="/static/styles.css"' in response.text
+    assert "Radar kontrol merkezi" in response.text
+    assert "Popüler kategori ajanları" in response.text
 
 
 @pytest.mark.asyncio
@@ -112,6 +114,25 @@ async def test_marketplace_control_center_lists_connector_states(client: AsyncCl
     }
     amazon = next(item for item in response.json() if item["key"] == "amazon_tr")
     assert amazon["access_state"] == "credentials_required"
+
+
+@pytest.mark.asyncio
+async def test_radar_api_reports_and_manages_category_agents(client: AsyncClient) -> None:
+    status = await client.get("/api/v1/radar")
+    categories = await client.get("/api/v1/radar/categories")
+    first = categories.json()[0]
+    updated = await client.patch(
+        f"/api/v1/radar/categories/{first['id']}",
+        json={"enabled": False},
+    )
+
+    assert status.status_code == 200
+    assert status.json()["catalog_enabled"] is True
+    assert status.json()["category_count"] >= 8
+    assert categories.status_code == 200
+    assert first["enabled"] is True
+    assert updated.status_code == 200
+    assert updated.json()["enabled"] is False
 
 
 @pytest.mark.asyncio

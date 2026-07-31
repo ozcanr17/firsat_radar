@@ -33,6 +33,7 @@ from app.domain.crawl import (
 )
 from app.services.raw_store import RawStore
 from app.sources.base import SourceAdapter
+from app.sources.hepsiburada.parser import extract_external_id
 
 AdapterFactory = Callable[[], SourceAdapter]
 
@@ -127,7 +128,61 @@ class CrawlService:
                 if not decision.allowed:
                     return self._finish_for_policy(run_id, decision)
                 detail = await adapter.enrich(stub)
-            return self._persist_product_refresh(run_id, product_id, detail)
+            return self._persist_product_refresh(run_id, product_id, detail, stub)
+        except SourceAccessError as error:
+            return self._finish_with_error(run_id, error.status, error.error_code)
+        except ParserDriftError as error:
+            return self._finish_with_error(run_id, RunStatus.PARSER_DRIFT, str(error))
+        except Exception:
+            self._finish_with_error(run_id, RunStatus.FAILED, "unexpected_error")
+            raise
+
+    async def discover_product(
+        self,
+        source_url: str,
+        label: str,
+        category: str | None,
+    ) -> CrawlSummary:
+        external_id = extract_external_id(source_url)
+        if external_id is None:
+            raise ValueError("invalid_product_url")
+        with self.session_factory() as session:
+            source = session.scalar(select(Source).where(Source.name == "hepsiburada"))
+            product = (
+                session.scalar(
+                    select(Product).where(
+                        Product.source_id == source.id,
+                        Product.external_id == external_id,
+                    )
+                )
+                if source is not None
+                else None
+            )
+        if product is not None:
+            return await self.refresh_product(product.id)
+        stub = ProductStub(
+            external_id=external_id,
+            source_url=source_url,
+            title=label,
+            price=None,
+            old_price=None,
+            rating=None,
+            review_count=None,
+            rank=1,
+            image_url=None,
+            delivery_text=None,
+            coverage=0.5,
+            confidence=0.5,
+        )
+        run_id = self._start_run()
+        try:
+            async with self.adapter_factory() as adapter:
+                decision = await adapter.policy_check(source_url)
+                self._record_policy(run_id, decision)
+                if not decision.allowed:
+                    return self._finish_for_policy(run_id, decision)
+                detail = await adapter.enrich(stub)
+            return self._persist_product_discovery(run_id, stub, detail, category)
         except SourceAccessError as error:
             return self._finish_with_error(run_id, error.status, error.error_code)
         except ParserDriftError as error:
@@ -414,6 +469,7 @@ class CrawlService:
         run_id: int,
         product_id: int,
         detail: ProductDetailResult,
+        fallback: ProductStub | None = None,
     ) -> CrawlSummary:
         with self.session_factory.begin() as session:
             product = session.get_one(Product, product_id)
@@ -426,8 +482,47 @@ class CrawlService:
             product.canonical_url = detail.canonical_url
             product.title = detail.title
             product.brand = detail.brand
+            product.image_url = (
+                detail.image_url or (fallback.image_url if fallback else None) or product.image_url
+            )
             product.last_fetch_id = detail_fetch.id
             product.last_seen_at = detail.detail_document.fetched_at
+            session.add(
+                ProductSnapshot(
+                    product_id=product.id,
+                    fetch_id=detail_fetch.id,
+                    observed_at=detail.detail_document.fetched_at,
+                    price=detail.price
+                    if detail.price is not None
+                    else fallback.price
+                    if fallback
+                    else None,
+                    old_price=(
+                        detail.old_price
+                        if detail.old_price is not None
+                        else fallback.old_price
+                        if fallback
+                        else None
+                    ),
+                    rating=(
+                        detail.rating
+                        if detail.rating is not None
+                        else fallback.rating
+                        if fallback
+                        else None
+                    ),
+                    review_count=(
+                        detail.review_count
+                        if detail.review_count is not None
+                        else fallback.review_count
+                        if fallback
+                        else None
+                    ),
+                    rank=1,
+                    coverage=detail.coverage,
+                    confidence=detail.confidence,
+                )
+            )
             session.add(
                 ProductDetail(
                     product_id=product.id,
@@ -495,12 +590,49 @@ class CrawlService:
                 products_seen=1,
                 products_created=0,
                 products_updated=1,
-                snapshots_created=0,
+                snapshots_created=1,
                 details_created=1,
                 reviews_created=reviews_created,
                 fetches_created=self._fetch_count(session, run_id),
                 listing_signature=signature,
             )
+
+    def _persist_product_discovery(
+        self,
+        run_id: int,
+        stub: ProductStub,
+        detail: ProductDetailResult,
+        category: str | None,
+    ) -> CrawlSummary:
+        with self.session_factory.begin() as session:
+            source_id = session.get_one(CrawlRun, run_id).source_id
+            product = Product(
+                source_id=source_id,
+                external_id=stub.external_id,
+                canonical_url=detail.canonical_url,
+                title=detail.title,
+                brand=detail.brand,
+                category=category,
+                image_url=detail.image_url,
+                last_seen_at=detail.detail_document.fetched_at,
+            )
+            session.add(product)
+            session.flush()
+            product_id = product.id
+        summary = self._persist_product_refresh(run_id, product_id, detail, stub)
+        return CrawlSummary(
+            run_id=summary.run_id,
+            status=summary.status,
+            products_seen=summary.products_seen,
+            products_created=1,
+            products_updated=0,
+            snapshots_created=summary.snapshots_created,
+            details_created=summary.details_created,
+            reviews_created=summary.reviews_created,
+            fetches_created=summary.fetches_created,
+            error_code=summary.error_code,
+            listing_signature=summary.listing_signature,
+        )
 
     def _finish_for_policy(self, run_id: int, decision: PolicyDecision) -> CrawlSummary:
         status_by_state = {

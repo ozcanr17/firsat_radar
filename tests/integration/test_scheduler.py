@@ -213,6 +213,28 @@ async def test_pipeline_prioritizes_watchlist_batch(settings: Settings) -> None:
 
 
 @pytest.mark.asyncio
+async def test_pipeline_runs_watchlist_and_catalog_in_same_cycle(settings: Settings) -> None:
+    crawler = FakeCrawler([crawl_summary(RunStatus.FAILED)])
+    watchlist = FakeCatalog(crawl_summary(RunStatus.COMPLETED))
+    catalog = FakeCatalog(crawl_summary(RunStatus.COMPLETED))
+    pipeline, _, analyzer, _, _, _, engine = build_pipeline(
+        settings,
+        crawler,
+        catalog=catalog,
+        watchlist=watchlist,
+    )
+
+    result = await pipeline.run()
+
+    assert result.status == "completed"
+    assert watchlist.page_counts == [settings.watchlist_targets_per_run]
+    assert catalog.page_counts == [settings.catalog_pages_per_run]
+    assert crawler.calls == 0
+    assert analyzer.calls == 1
+    engine.dispose()
+
+
+@pytest.mark.asyncio
 async def test_security_block_opens_circuit_and_prevents_next_run(settings: Settings) -> None:
     crawler = FakeCrawler([crawl_summary(RunStatus.BLOCKED, "listing_security_block")])
     pipeline, runtime, analyzer, backup, retention, _, engine = build_pipeline(settings, crawler)

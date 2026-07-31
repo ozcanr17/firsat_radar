@@ -9,6 +9,7 @@ from app.api.commerce import create_commerce_router
 from app.api.health import create_health_router
 from app.api.opportunities import create_opportunities_router
 from app.api.products import create_products_router
+from app.api.radar import create_radar_router
 from app.bootstrap import build_pipeline
 from app.config import Settings, get_settings
 from app.db.migrations import upgrade_database
@@ -26,6 +27,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     upgrade_database(active_settings)
     engine = build_engine(active_settings)
     session_factory = build_session_factory(engine)
+    pipeline = build_pipeline(active_settings, session_factory)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -33,7 +35,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if active_settings.embedded_scheduler_enabled:
             scheduler = build_scheduler(
                 active_settings,
-                build_pipeline(active_settings, session_factory),
+                pipeline,
             )
             scheduler.start()
         try:
@@ -53,10 +55,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.state.settings = active_settings
     application.state.engine = engine
     application.state.session_factory = session_factory
+    application.state.pipeline = pipeline
     application.include_router(create_health_router(session_factory))
     application.include_router(create_commerce_router(session_factory))
     application.include_router(create_products_router(session_factory))
     application.include_router(create_opportunities_router(session_factory))
+    application.include_router(create_radar_router(active_settings, session_factory))
     application.include_router(create_web_router(active_settings, session_factory))
     application.mount("/static", StaticFiles(directory=STATIC_PATH), name="static")
     return application

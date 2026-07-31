@@ -275,3 +275,44 @@ async def test_watchlist_refreshes_due_product_detail(settings: Settings) -> Non
         assert stored_target.last_checked_at is not None
     finally:
         engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_watchlist_discovers_and_links_new_product_url(settings: Settings) -> None:
+    upgrade_database(settings)
+    engine = build_engine(settings)
+    session_factory = build_session_factory(engine)
+    detail = build_detail()
+    service = CrawlService(
+        settings,
+        session_factory,
+        lambda: FakeAdapter(build_listing(), detail),
+    )
+    try:
+        target = add_watch_target(
+            session_factory,
+            WatchTargetInput(
+                target_type="product",
+                label="Yeni keşfedilecek ürün",
+                source_url=detail.canonical_url,
+                category="Anne / Bebek / Oyuncak",
+                priority=5,
+                refresh_interval_hours=1,
+            ),
+        )
+
+        result = await WatchlistMonitor(session_factory, service).refresh_due(limit=1)
+
+        with session_factory() as session:
+            stored_target = session.get_one(WatchTarget, target.id)
+            product = session.get_one(Product, stored_target.product_id)
+            snapshot_count = session.scalar(select(func.count()).select_from(ProductSnapshot))
+
+        assert result.queued == 1
+        assert result.refreshed == 1
+        assert result.items[0].product_id == product.id
+        assert product.external_id == "HBCV0000000001"
+        assert stored_target.last_status == "completed"
+        assert snapshot_count == 1
+    finally:
+        engine.dispose()

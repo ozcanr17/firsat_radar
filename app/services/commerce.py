@@ -9,6 +9,7 @@ from app.db.models import BusinessCase, Product, WatchTarget
 from app.db.session import SessionFactory
 from app.services.marketplaces import MARKETPLACE_BY_KEY
 from app.services.products import ProductView, list_latest_products
+from app.sources.hepsiburada.parser import extract_external_id
 
 MONEY = Decimal("0.01")
 ALLOWED_TARGET_TYPES = {"product", "category"}
@@ -131,6 +132,13 @@ def add_watch_target(
     )
     if target_type == "product" and source_url is None:
         raise ValueError("product_url_required")
+    if (
+        target_type == "product"
+        and source_name == "hepsiburada"
+        and source_url is not None
+        and extract_external_id(source_url) is None
+    ):
+        raise ValueError("invalid_product_url")
     category = target.category.strip() if target.category else None
     with session_factory.begin() as session:
         product = (
@@ -235,7 +243,9 @@ def watch_target_view(
         queue_score=queue_score,
         access_state=(
             "discovery_pending"
-            if marketplace.access_state == "active" and target.product_id is None
+            if marketplace.access_state == "active"
+            and target.target_type == "product"
+            and target.product_id is None
             else marketplace.access_state
         ),
     )

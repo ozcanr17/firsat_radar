@@ -1,17 +1,20 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from app.db.models import WatchTarget
+from sqlalchemy import select
+
+from app.db.models import Product, WatchTarget
 from app.db.session import SessionFactory
-from app.domain.crawl import CrawlSummary, RunStatus
+from app.domain.crawl import CrawlLimits, CrawlSummary, RunStatus
 from app.services.commerce import list_watch_targets
 from app.services.crawl import CrawlService
+from app.sources.hepsiburada.parser import extract_external_id
 
 
 @dataclass(frozen=True)
 class WatchlistRefreshItem:
     target_id: int
-    product_id: int
+    product_id: int | None
     label: str
     status: str
     error_code: str | None
@@ -40,19 +43,37 @@ class WatchlistMonitor:
         due = [
             target
             for target in list_watch_targets(self.session_factory)
-            if target.enabled and target.refresh_due and target.product_id is not None
+            if target.enabled and target.refresh_due and target.source_url is not None
         ][:limit]
         items = []
         stopped = False
         for target in due:
-            if target.product_id is None:
+            if target.product_id is not None:
+                summary = await self.crawler.refresh_product(target.product_id)
+            elif target.target_type == "product" and target.source_url is not None:
+                summary = await self.crawler.discover_product(
+                    target.source_url,
+                    target.label,
+                    target.category,
+                )
+                self._link_product(target.id, target.source_url)
+            elif target.source_url is not None:
+                summary = await self.crawler.crawl_target(
+                    target.source_url,
+                    target.category or target.label,
+                    CrawlLimits(
+                        products=self.crawler.settings.catalog_products_per_page,
+                        details=self.crawler.settings.catalog_details_per_page,
+                    ),
+                )
+            else:
                 continue
-            summary = await self.crawler.refresh_product(target.product_id)
             self._mark_target(target.id, summary.status.value, datetime.now(UTC))
+            product_id = self._product_id(target.id)
             items.append(
                 WatchlistRefreshItem(
                     target_id=target.id,
-                    product_id=target.product_id,
+                    product_id=product_id,
                     label=target.label,
                     status=summary.status.value,
                     error_code=summary.error_code,
@@ -96,3 +117,17 @@ class WatchlistMonitor:
             target = session.get_one(WatchTarget, target_id)
             target.last_status = status
             target.last_checked_at = checked_at
+
+    def _link_product(self, target_id: int, source_url: str) -> None:
+        external_id = extract_external_id(source_url)
+        if external_id is None:
+            return
+        with self.session_factory.begin() as session:
+            target = session.get_one(WatchTarget, target_id)
+            product = session.scalar(select(Product).where(Product.external_id == external_id))
+            if product is not None:
+                target.product_id = product.id
+
+    def _product_id(self, target_id: int) -> int | None:
+        with self.session_factory() as session:
+            return session.get_one(WatchTarget, target_id).product_id
