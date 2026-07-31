@@ -94,8 +94,6 @@ def crawl(
     limit_details: int = typer.Option(0, min=0, max=20),
 ) -> None:
     validate_source(source)
-    if limit_details:
-        raise typer.BadParameter("Product detail collection starts in Stage 3")
     settings = Settings()
     upgrade_database(settings)
     service, engine = build_crawl_service(settings)

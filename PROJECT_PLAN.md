@@ -20,13 +20,13 @@ Implement policy gate, live listing discovery, normalization, provenance, snapsh
 
 ## Stage 3: Product detail and reviews
 
-Status: Ready.
+Status: Complete.
 
 Collect only permitted fields, with explicit coverage and reason codes for unavailable data.
 
 ## Stage 4: Analysis engine
 
-Status: Pending.
+Status: Ready.
 
 Implement deltas, percentiles, rule-based Turkish review labels, opportunity scores, evidence, and confidence.
 

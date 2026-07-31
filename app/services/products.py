@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from sqlalchemy import Select, func, select
 
-from app.db.models import Product, ProductSnapshot
+from app.db.models import Product, ProductDetail, ProductSnapshot, Review
 from app.db.session import SessionFactory
 
 
@@ -22,18 +22,42 @@ class ProductView:
     rank: int | None
     coverage: float
     confidence: float
+    detail_coverage: float | None
+    detail_confidence: float | None
+    stored_review_count: int
 
 
-def latest_products_query() -> Select[tuple[Product, ProductSnapshot]]:
+def latest_products_query() -> Select[
+    tuple[Product, ProductSnapshot, float | None, float | None, int]
+]:
     latest_snapshot_id = (
         select(func.max(ProductSnapshot.id))
         .where(ProductSnapshot.product_id == Product.id)
         .correlate(Product)
         .scalar_subquery()
     )
+    latest_detail_id = (
+        select(func.max(ProductDetail.id))
+        .where(ProductDetail.product_id == Product.id)
+        .correlate(Product)
+        .scalar_subquery()
+    )
+    stored_review_count = (
+        select(func.count(Review.id))
+        .where(Review.product_id == Product.id)
+        .correlate(Product)
+        .scalar_subquery()
+    )
     return (
-        select(Product, ProductSnapshot)
+        select(
+            Product,
+            ProductSnapshot,
+            ProductDetail.coverage,
+            ProductDetail.confidence,
+            stored_review_count,
+        )
         .join(ProductSnapshot, ProductSnapshot.id == latest_snapshot_id)
+        .outerjoin(ProductDetail, ProductDetail.id == latest_detail_id)
         .order_by(ProductSnapshot.rank.asc(), Product.id.asc())
     )
 
@@ -55,6 +79,9 @@ def list_latest_products(session_factory: SessionFactory, limit: int = 60) -> li
             rank=snapshot.rank,
             coverage=snapshot.coverage,
             confidence=snapshot.confidence,
+            detail_coverage=detail_coverage,
+            detail_confidence=detail_confidence,
+            stored_review_count=stored_review_count,
         )
-        for product, snapshot in rows
+        for product, snapshot, detail_coverage, detail_confidence, stored_review_count in rows
     ]

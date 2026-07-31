@@ -83,6 +83,48 @@ class ListingResult:
 
 
 @dataclass(frozen=True)
+class FetchedDocument:
+    url: str
+    fetched_at: datetime
+    status_code: int | None
+    content_hash: str
+    raw_html: str
+    parser_version: str
+    coverage: float
+    confidence: float
+
+
+@dataclass(frozen=True)
+class ReviewStub:
+    source_review_id: str
+    rating: float | None
+    review_date: datetime | None
+    text_redacted: str
+    source_url: str
+
+
+@dataclass(frozen=True)
+class ProductDetailResult:
+    listing_external_id: str
+    canonical_url: str
+    title: str
+    brand: str | None
+    seller: str | None
+    description: str | None
+    attributes: dict[str, str]
+    origin: str | None
+    overseas_sale: str | None
+    stock: str | None
+    review_url: str | None
+    coverage: float
+    confidence: float
+    reason_codes: tuple[str, ...]
+    detail_document: FetchedDocument
+    reviews: tuple[ReviewStub, ...]
+    review_document: FetchedDocument | None
+
+
+@dataclass(frozen=True)
 class CrawlSummary:
     run_id: int
     status: RunStatus
@@ -90,6 +132,8 @@ class CrawlSummary:
     products_created: int
     products_updated: int
     snapshots_created: int
+    details_created: int
+    reviews_created: int
     fetches_created: int
     error_code: str | None
 

@@ -21,6 +21,9 @@ class ProductResponse(BaseModel):
     rank: int | None
     coverage: float
     confidence: float
+    detail_coverage: float | None
+    detail_confidence: float | None
+    stored_review_count: int
 
 
 class ProductListResponse(BaseModel):

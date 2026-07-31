@@ -6,15 +6,26 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import Settings
-from app.db.models import CrawlRun, Fetch, Offer, Product, ProductSnapshot, Source
+from app.db.models import (
+    CrawlRun,
+    Fetch,
+    Offer,
+    Product,
+    ProductDetail,
+    ProductSnapshot,
+    Review,
+    Source,
+)
 from app.db.session import SessionFactory
 from app.domain.crawl import (
     CrawlLimits,
     CrawlSummary,
+    FetchedDocument,
     ListingResult,
     ParserDriftError,
     PolicyDecision,
     PolicyState,
+    ProductDetailResult,
     RunStatus,
     SourceAccessError,
 )
@@ -55,7 +66,11 @@ class CrawlService:
                 if not decision.allowed:
                     return self._finish_for_policy(run_id, decision)
                 listing = await adapter.discover(self.settings.hepsiburada_start_url, limits)
-            return self._persist_listing(run_id, listing)
+                detail_results = []
+                for product in listing.products[: limits.details]:
+                    detail_results.append(await adapter.enrich(product))
+                details = tuple(detail_results)
+            return self._persist_crawl(run_id, listing, details)
         except SourceAccessError as error:
             return self._finish_with_error(run_id, error.status, error.error_code)
         except ParserDriftError as error:
@@ -107,7 +122,12 @@ class CrawlService:
                 )
             )
 
-    def _persist_listing(self, run_id: int, listing: ListingResult) -> CrawlSummary:
+    def _persist_crawl(
+        self,
+        run_id: int,
+        listing: ListingResult,
+        details: tuple[ProductDetailResult, ...],
+    ) -> CrawlSummary:
         raw_path = self.raw_store.save(
             listing.raw_html,
             listing.content_hash,
@@ -140,18 +160,11 @@ class CrawlService:
             )
             session.add(fetch)
             session.flush()
-            if duplicate is not None:
-                return self._finish_in_session(
-                    session,
-                    run_id,
-                    RunStatus.UNCHANGED,
-                    products_seen=len(listing.products),
-                    fetches_created=2,
-                )
             source_id = session.get_one(CrawlRun, run_id).source_id
             products_created = 0
             products_updated = 0
             snapshots_created = 0
+            products_by_external_id: dict[str, Product] = {}
             for stub in listing.products:
                 product = session.scalar(
                     select(Product).where(
@@ -173,47 +186,166 @@ class CrawlService:
                     session.add(product)
                     session.flush()
                     products_created += 1
-                else:
+                elif duplicate is None:
                     product.canonical_url = stub.source_url
                     product.title = stub.title
                     product.image_url = stub.image_url
                     product.last_fetch_id = fetch.id
                     product.last_seen_at = listing.fetched_at
                     products_updated += 1
-                session.add(
-                    ProductSnapshot(
-                        product_id=product.id,
-                        fetch_id=fetch.id,
-                        observed_at=listing.fetched_at,
-                        price=stub.price,
-                        old_price=stub.old_price,
-                        rating=stub.rating,
-                        review_count=stub.review_count,
-                        rank=stub.rank,
-                        coverage=stub.coverage,
-                        confidence=stub.confidence,
-                    )
-                )
-                snapshots_created += 1
-                if stub.delivery_text:
+                products_by_external_id[stub.external_id] = product
+                if duplicate is None:
                     session.add(
-                        Offer(
+                        ProductSnapshot(
                             product_id=product.id,
                             fetch_id=fetch.id,
                             observed_at=listing.fetched_at,
-                            delivery_text=stub.delivery_text,
+                            price=stub.price,
+                            old_price=stub.old_price,
+                            rating=stub.rating,
+                            review_count=stub.review_count,
+                            rank=stub.rank,
+                            coverage=stub.coverage,
+                            confidence=stub.confidence,
                         )
                     )
+                    snapshots_created += 1
+                    if stub.delivery_text:
+                        session.add(
+                            Offer(
+                                product_id=product.id,
+                                fetch_id=fetch.id,
+                                observed_at=listing.fetched_at,
+                                delivery_text=stub.delivery_text,
+                            )
+                        )
+            details_created = 0
+            reviews_created = 0
+            for detail in details:
+                product = products_by_external_id.get(detail.listing_external_id)
+                if product is None:
+                    continue
+                detail_fetch = self._persist_document_fetch(
+                    session,
+                    run_id,
+                    detail.detail_document,
+                    {
+                        "kind": "product_detail",
+                        "reason_codes": detail.reason_codes,
+                    },
+                )
+                product.canonical_url = detail.canonical_url
+                product.title = detail.title
+                product.brand = detail.brand
+                product.last_fetch_id = detail_fetch.id
+                product.last_seen_at = detail.detail_document.fetched_at
+                session.add(
+                    ProductDetail(
+                        product_id=product.id,
+                        fetch_id=detail_fetch.id,
+                        observed_at=detail.detail_document.fetched_at,
+                        description_text=detail.description,
+                        attributes_json=json.dumps(detail.attributes, ensure_ascii=False),
+                        origin=detail.origin,
+                        overseas_sale=detail.overseas_sale,
+                        stock=detail.stock,
+                        review_url=detail.review_url,
+                        coverage=detail.coverage,
+                        confidence=detail.confidence,
+                        reason_codes_json=json.dumps(detail.reason_codes, ensure_ascii=False),
+                    )
+                )
+                details_created += 1
+                if detail.seller:
+                    session.add(
+                        Offer(
+                            product_id=product.id,
+                            fetch_id=detail_fetch.id,
+                            observed_at=detail.detail_document.fetched_at,
+                            seller=detail.seller,
+                        )
+                    )
+                if detail.review_document is None:
+                    continue
+                review_fetch = self._persist_document_fetch(
+                    session,
+                    run_id,
+                    detail.review_document,
+                    {
+                        "identity_redacted": True,
+                        "kind": "public_reviews",
+                        "review_count": len(detail.reviews),
+                    },
+                )
+                for review in detail.reviews:
+                    existing = session.scalar(
+                        select(Review).where(
+                            Review.product_id == product.id,
+                            Review.source_review_id == review.source_review_id,
+                        )
+                    )
+                    if existing is not None:
+                        continue
+                    session.add(
+                        Review(
+                            product_id=product.id,
+                            fetch_id=review_fetch.id,
+                            source_review_id=review.source_review_id,
+                            rating=review.rating,
+                            review_date=review.review_date,
+                            text_redacted=review.text_redacted,
+                            source_url=review.source_url,
+                            observed_at=detail.review_document.fetched_at,
+                        )
+                    )
+                    reviews_created += 1
+            status = (
+                RunStatus.UNCHANGED
+                if duplicate is not None and not details
+                else RunStatus.COMPLETED
+            )
             return self._finish_in_session(
                 session,
                 run_id,
-                RunStatus.COMPLETED,
+                status,
                 products_seen=len(listing.products),
                 products_created=products_created,
                 products_updated=products_updated,
                 snapshots_created=snapshots_created,
-                fetches_created=2,
+                details_created=details_created,
+                reviews_created=reviews_created,
+                fetches_created=self._fetch_count(session, run_id),
             )
+
+    def _persist_document_fetch(
+        self,
+        session: Session,
+        run_id: int,
+        document: FetchedDocument,
+        metadata: dict[str, object],
+    ) -> Fetch:
+        raw_path = self.raw_store.save(
+            document.raw_html,
+            document.content_hash,
+            document.fetched_at,
+            "html",
+        )
+        fetch = Fetch(
+            run_id=run_id,
+            url=document.url,
+            fetched_at=document.fetched_at,
+            status_code=document.status_code,
+            content_hash=document.content_hash,
+            parser_version=document.parser_version,
+            coverage=document.coverage,
+            debug_metadata_json=json.dumps(
+                {**metadata, "confidence": document.confidence, "raw_path": str(raw_path)},
+                ensure_ascii=False,
+            ),
+        )
+        session.add(fetch)
+        session.flush()
+        return fetch
 
     def _finish_for_policy(self, run_id: int, decision: PolicyDecision) -> CrawlSummary:
         status_by_state = {
@@ -248,6 +380,8 @@ class CrawlService:
         products_created: int = 0,
         products_updated: int = 0,
         snapshots_created: int = 0,
+        details_created: int = 0,
+        reviews_created: int = 0,
         fetches_created: int = 0,
         error_code: str | None = None,
     ) -> CrawlSummary:
@@ -258,6 +392,8 @@ class CrawlService:
             products_created=products_created,
             products_updated=products_updated,
             snapshots_created=snapshots_created,
+            details_created=details_created,
+            reviews_created=reviews_created,
             fetches_created=fetches_created,
             error_code=error_code,
         )
@@ -271,6 +407,8 @@ class CrawlService:
                 "products_created": products_created,
                 "products_updated": products_updated,
                 "snapshots_created": snapshots_created,
+                "details_created": details_created,
+                "reviews_created": reviews_created,
                 "fetches_created": fetches_created,
             }
         )

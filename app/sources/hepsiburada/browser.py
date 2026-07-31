@@ -12,11 +12,22 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from app.config import Settings
 from app.domain.crawl import (
     CrawlLimits,
+    FetchedDocument,
     ListingResult,
     PolicyDecision,
     PolicyState,
+    ProductDetailResult,
+    ProductStub,
+    ReviewStub,
     RunStatus,
     SourceAccessError,
+)
+from app.sources.hepsiburada.detail_parser import (
+    RenderedProductDetail,
+    RenderedReview,
+    build_review_evidence,
+    parse_product_detail,
+    parse_reviews,
 )
 from app.sources.hepsiburada.parser import RenderedProductCard, parse_cards
 from app.sources.hepsiburada.policy import RobotsPolicy
@@ -24,6 +35,8 @@ from app.sources.hepsiburada.policy import RobotsPolicy
 BASE_URL = "https://www.hepsiburada.com"
 ROBOTS_URL = f"{BASE_URL}/robots.txt"
 PARSER_VERSION = "hepsiburada-listing-browser-v1"
+DETAIL_PARSER_VERSION = "hepsiburada-detail-browser-v1"
+REVIEW_PARSER_VERSION = "hepsiburada-review-browser-v1"
 PRODUCT_CARD_SELECTOR = "main article"
 PRODUCT_LINK_SELECTOR = "a[href*='-p-'], a[href*='-pm-']"
 
@@ -157,6 +170,180 @@ class HepsiburadaBrowserAdapter:
             coverage=coverage,
             parser_version=PARSER_VERSION,
         )
+
+    async def enrich(self, product: ProductStub) -> ProductDetailResult:
+        decision = await self.policy_check(product.source_url)
+        if not decision.allowed:
+            raise SourceAccessError(RunStatus.POLICY_DENIED, "detail_policy_denied")
+        page, status_code = await self._navigate(product.source_url, "detail")
+        await page.wait_for_selector("main h1", state="attached")
+        detail_payload = cast(
+            dict[str, Any],
+            await page.locator("main").evaluate(
+                """
+                main => {
+                    const visible = element => element && element.innerText.trim();
+                    const heading = main.querySelector("h1");
+                    const brandLink = heading ? heading.querySelector("a") : null;
+                    const sellerLink = main.querySelector("a[href*='/magaza/']");
+                    const reviewLink = main.querySelector("a[href$='-yorumlari']");
+                    const panel = main.querySelector("[role='tabpanel']");
+                    const panelText = visible(panel) || "";
+                    const marker = panelText.indexOf("Ürün özellikleri");
+                    const description = marker >= 0 ? panelText.slice(0, marker) : panelText;
+                    return {
+                        title: visible(heading) || "",
+                        brand: visible(brandLink) || null,
+                        seller: visible(sellerLink) || null,
+                        reviewUrl: reviewLink ? reviewLink.href : null,
+                        description,
+                        productInfoText: panelText
+                    };
+                }
+                """
+            ),
+        )
+        canonical_url = page.url
+        detail_raw_html = await page.content()
+        fetched_at = datetime.now(UTC)
+        parsed = parse_product_detail(
+            RenderedProductDetail(
+                title=str(detail_payload["title"]),
+                brand=str(detail_payload["brand"]) if detail_payload.get("brand") else None,
+                seller=str(detail_payload["seller"]) if detail_payload.get("seller") else None,
+                description=str(detail_payload["description"])
+                if detail_payload.get("description")
+                else None,
+                product_info_text=str(detail_payload["productInfoText"]),
+                review_url=str(detail_payload["reviewUrl"])
+                if detail_payload.get("reviewUrl")
+                else None,
+            )
+        )
+        detail_document = FetchedDocument(
+            url=canonical_url,
+            fetched_at=fetched_at,
+            status_code=status_code,
+            content_hash=hashlib.sha256(detail_raw_html.encode()).hexdigest(),
+            raw_html=detail_raw_html,
+            parser_version=DETAIL_PARSER_VERSION,
+            coverage=parsed.coverage,
+            confidence=parsed.confidence,
+        )
+        reviews: tuple[ReviewStub, ...] = ()
+        review_document: FetchedDocument | None = None
+        reason_codes = list(parsed.reason_codes)
+        if parsed.review_url:
+            reviews, review_document = await self._collect_reviews(
+                canonical_url,
+                parsed.review_url,
+            )
+            if not reviews:
+                reason_codes.append("reviews_unavailable")
+        else:
+            reason_codes.append("review_url_unavailable")
+        return ProductDetailResult(
+            listing_external_id=product.external_id,
+            canonical_url=canonical_url,
+            title=parsed.title,
+            brand=parsed.brand,
+            seller=parsed.seller,
+            description=parsed.description,
+            attributes=parsed.attributes,
+            origin=parsed.origin,
+            overseas_sale=parsed.overseas_sale,
+            stock=parsed.stock,
+            review_url=parsed.review_url,
+            coverage=parsed.coverage,
+            confidence=parsed.confidence,
+            reason_codes=tuple(reason_codes),
+            detail_document=detail_document,
+            reviews=reviews,
+            review_document=review_document,
+        )
+
+    async def _collect_reviews(
+        self,
+        canonical_url: str,
+        review_url: str,
+    ) -> tuple[tuple[ReviewStub, ...], FetchedDocument]:
+        decision = await self.policy_check(review_url)
+        if not decision.allowed:
+            raise SourceAccessError(RunStatus.POLICY_DENIED, "review_policy_denied")
+        page, status_code = await self._navigate(review_url, "review")
+        await page.wait_for_selector("main", state="attached")
+        projected = cast(
+            list[dict[str, Any]],
+            await page.locator("main").evaluate(
+                """
+                main => {
+                    const nodes = Array.from(main.querySelectorAll("article, li, div"));
+                    const containsReview = element => {
+                        const text = element.innerText || "";
+                        return text.includes("Kullanıcı bu ürünü") &&
+                            text.includes("Bu değerlendirme faydalı mı?");
+                    };
+                    return nodes.filter(element => containsReview(element) &&
+                        !Array.from(element.children).some(containsReview))
+                        .slice(0, 20)
+                        .map(element => {
+                            const lines = (element.innerText || "").split("\\n")
+                                .map(value => value.trim()).filter(Boolean);
+                            const dateText = lines.find(value =>
+                                /^\\d{1,2}\\s+[A-Za-zÇĞİÖŞÜçğıöşü]+/.test(value)) || null;
+                            const identityIndex = lines.findIndex(value => /\\*{3}/.test(value));
+                            const markerIndex = lines.findIndex(value =>
+                                value === "Kullanıcı bu ürünü");
+                            const start = identityIndex >= 0 ? identityIndex + 1 : 0;
+                            const end = markerIndex > start ? markerIndex : lines.length;
+                            return {dateText, text: lines.slice(start, end).join(" ")};
+                        }).filter(review => review.text);
+                }
+                """
+            ),
+        )
+        observed_at = datetime.now(UTC)
+        reviews = parse_reviews(
+            [
+                RenderedReview(
+                    date_text=str(item["dateText"]) if item.get("dateText") else None,
+                    text=str(item["text"]),
+                )
+                for item in projected
+            ],
+            canonical_url,
+            page.url,
+            observed_at,
+        )
+        evidence = build_review_evidence(reviews)
+        coverage = 1.0 if reviews else 0.0
+        document = FetchedDocument(
+            url=page.url,
+            fetched_at=observed_at,
+            status_code=status_code,
+            content_hash=hashlib.sha256(evidence.encode()).hexdigest(),
+            raw_html=evidence,
+            parser_version=REVIEW_PARSER_VERSION,
+            coverage=coverage,
+            confidence=coverage,
+        )
+        return reviews, document
+
+    async def _navigate(self, url: str, page_kind: str) -> tuple[Page, int | None]:
+        await self.rate_limiter.wait()
+        page = await self._active_page()
+        try:
+            response = await page.goto(url, wait_until="domcontentloaded")
+        except PlaywrightTimeoutError as error:
+            self.rate_limiter.mark()
+            raise SourceAccessError(RunStatus.BLOCKED, f"{page_kind}_timeout") from error
+        self.rate_limiter.mark()
+        status_code = response.status if response is not None else None
+        page_title = await page.title()
+        visible_text = await page.locator("body").inner_text(timeout=5000)
+        if self._is_security_block(status_code, page_title, visible_text[:3000]):
+            raise SourceAccessError(RunStatus.BLOCKED, f"{page_kind}_security_block")
+        return page, status_code
 
     async def _active_page(self) -> Page:
         if self.page is not None:

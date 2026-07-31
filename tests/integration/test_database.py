@@ -13,6 +13,7 @@ EXPECTED_TABLES = {
     "fetches",
     "offers",
     "opportunities",
+    "product_details",
     "product_snapshots",
     "products",
     "review_labels",

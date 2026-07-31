@@ -4,7 +4,7 @@ Firsat Radar is a local-first product opportunity research application planned a
 
 ## Current status
 
-Stage 2 is complete. The application performs a policy-gated, single-tab browser crawl of the public Hepsiburada Anne, Bebek, Oyuncak listing and persists real products, provenance, and snapshots without restricted endpoints.
+Stage 3 is complete. The application performs a policy-gated, single-tab browser crawl of the public Hepsiburada Anne, Bebek, Oyuncak listing, enriches a strictly limited product set, and stores identity-minimized public reviews without restricted endpoints.
 
 See [ADR 0002](docs/adr/0002-browser-data-access.md) and [HANDOFF.md](HANDOFF.md) for evidence and next steps.
 
@@ -25,14 +25,15 @@ cp .env.example .env
 
 ## Run
 
-Check the current policy and run a limited live listing crawl:
+Check the current policy and run a limited live crawl:
 
 ```bash
 .venv/bin/python -m app.cli policy-check --source hepsiburada
 .venv/bin/python -m app.cli crawl --source hepsiburada --limit-products 20
+.venv/bin/python -m app.cli crawl --source hepsiburada --limit-products 5 --limit-details 2
 ```
 
-The browser runs visibly, uses one tab, and stops on an access block or CAPTCHA. Product detail and review collection remain disabled until Stage 3.
+The browser runs visibly, uses one tab, and stops on an access block or CAPTCHA. Each requested detail includes only its first public rendered review page. Reviewer identity is discarded before persistence, and direct contact identifiers in review text are redacted.
 
 Start the local application:
 

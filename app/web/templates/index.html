@@ -34,6 +34,8 @@
                             <th>Fiyat</th>
                             <th>Puan</th>
                             <th>Değerlendirme</th>
+                            <th>Kayıtlı yorum</th>
+                            <th>Detay kapsamı</th>
                             <th>Güven</th>
                         </tr>
                     </thead>
@@ -45,6 +47,8 @@
                             <td>{{ "%.2f"|format(product.price) if product.price is not none else "—" }} TL</td>
                             <td>{{ product.rating if product.rating is not none else "—" }}</td>
                             <td>{{ product.review_count if product.review_count is not none else "—" }}</td>
+                            <td>{{ product.stored_review_count }}</td>
+                            <td>{{ "%.0f"|format(product.detail_coverage * 100) ~ "%" if product.detail_coverage is not none else "—" }}</td>
                             <td>{{ "%.0f"|format(product.confidence * 100) }}%</td>
                         </tr>
                     {% endfor %}

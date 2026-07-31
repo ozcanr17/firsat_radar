@@ -1,7 +1,13 @@
 from types import TracebackType
 from typing import Protocol, Self
 
-from app.domain.crawl import CrawlLimits, ListingResult, PolicyDecision
+from app.domain.crawl import (
+    CrawlLimits,
+    ListingResult,
+    PolicyDecision,
+    ProductDetailResult,
+    ProductStub,
+)
 
 
 class SourceAdapter(Protocol):
@@ -17,3 +23,5 @@ class SourceAdapter(Protocol):
     async def policy_check(self, url: str) -> PolicyDecision: ...
 
     async def discover(self, start_url: str, limits: CrawlLimits) -> ListingResult: ...
+
+    async def enrich(self, product: ProductStub) -> ProductDetailResult: ...

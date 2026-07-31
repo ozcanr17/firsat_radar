@@ -9,14 +9,17 @@ from sqlalchemy import func, select
 
 from app.config import Settings
 from app.db.migrations import upgrade_database
-from app.db.models import CrawlRun, Fetch, Product, ProductSnapshot
+from app.db.models import CrawlRun, Fetch, Product, ProductDetail, ProductSnapshot, Review
 from app.db.session import build_engine, build_session_factory
 from app.domain.crawl import (
     CrawlLimits,
+    FetchedDocument,
     ListingResult,
     PolicyDecision,
     PolicyState,
+    ProductDetailResult,
     ProductStub,
+    ReviewStub,
     RunStatus,
 )
 from app.main import create_app
@@ -24,8 +27,13 @@ from app.services.crawl import CrawlService
 
 
 class FakeAdapter:
-    def __init__(self, listing: ListingResult) -> None:
+    def __init__(
+        self,
+        listing: ListingResult,
+        detail: ProductDetailResult | None = None,
+    ) -> None:
         self.listing = listing
+        self.detail = detail
 
     async def __aenter__(self) -> Self:
         return self
@@ -51,6 +59,11 @@ class FakeAdapter:
 
     async def discover(self, start_url: str, limits: CrawlLimits) -> ListingResult:
         return self.listing
+
+    async def enrich(self, product: ProductStub) -> ProductDetailResult:
+        if self.detail is None:
+            raise RuntimeError("Detail fixture unavailable")
+        return self.detail
 
 
 def build_listing() -> ListingResult:
@@ -80,6 +93,56 @@ def build_listing() -> ListingResult:
         candidate_count=1,
         coverage=1.0,
         parser_version="test-v1",
+    )
+
+
+def build_detail() -> ProductDetailResult:
+    observed_at = datetime.now(UTC)
+    canonical_url = "https://www.hepsiburada.com/canli-urun-p-HBCV0000000001"
+    review_url = f"{canonical_url}-yorumlari"
+    review = ReviewStub(
+        source_review_id="a" * 64,
+        rating=None,
+        review_date=observed_at,
+        text_redacted="Paketleme özenli ve ürün kullanışlı.",
+        source_url=review_url,
+    )
+    return ProductDetailResult(
+        listing_external_id="HBCV0000000001",
+        canonical_url=canonical_url,
+        title="Canlı Ürün Detayı",
+        brand="Canlı Marka",
+        seller="Canlı Satıcı",
+        description="Görünür ürün açıklaması",
+        attributes={"Menşei": "TR - Türkiye", "Stok Adedi": "10 adetten az"},
+        origin="TR - Türkiye",
+        overseas_sale="Yok",
+        stock="10 adetten az",
+        review_url=review_url,
+        coverage=1.0,
+        confidence=1.0,
+        reason_codes=(),
+        detail_document=FetchedDocument(
+            url=canonical_url,
+            fetched_at=observed_at,
+            status_code=200,
+            content_hash="detail-hash",
+            raw_html="<main>visible detail</main>",
+            parser_version="detail-test-v1",
+            coverage=1.0,
+            confidence=1.0,
+        ),
+        reviews=(review,),
+        review_document=FetchedDocument(
+            url=review_url,
+            fetched_at=observed_at,
+            status_code=200,
+            content_hash="review-hash",
+            raw_html="<main data-identity-redacted='true'>visible review</main>",
+            parser_version="review-test-v1",
+            coverage=1.0,
+            confidence=1.0,
+        ),
     )
 
 
@@ -115,5 +178,39 @@ async def test_crawl_is_idempotent(settings: Settings) -> None:
         assert response.status_code == 200
         assert response.json()["count"] == 1
         assert response.json()["items"][0]["fetch_id"] == 2
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_detail_and_reviews_are_persisted_with_review_idempotency(
+    settings: Settings,
+) -> None:
+    upgrade_database(settings)
+    engine = build_engine(settings)
+    session_factory = build_session_factory(engine)
+    service = CrawlService(
+        settings,
+        session_factory,
+        lambda: FakeAdapter(build_listing(), build_detail()),
+    )
+    try:
+        first = await service.crawl(CrawlLimits(products=1, details=1))
+        second = await service.crawl(CrawlLimits(products=1, details=1))
+
+        with session_factory() as session:
+            detail_count = session.scalar(select(func.count()).select_from(ProductDetail))
+            review_count = session.scalar(select(func.count()).select_from(Review))
+            product = session.scalar(select(Product))
+
+        assert first.details_created == 1
+        assert first.reviews_created == 1
+        assert second.details_created == 1
+        assert second.reviews_created == 0
+        assert detail_count == 2
+        assert review_count == 1
+        assert product is not None
+        assert product.brand == "Canlı Marka"
+        assert product.canonical_url.endswith("HBCV0000000001")
     finally:
         engine.dispose()

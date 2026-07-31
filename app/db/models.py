@@ -103,6 +103,27 @@ class ProductSnapshot(Base):
     confidence: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
 
 
+class ProductDetail(Base):
+    __tablename__ = "product_details"
+    __table_args__ = (Index("ix_product_details_product_observed", "product_id", "observed_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), nullable=False)
+    fetch_id: Mapped[int] = mapped_column(ForeignKey("fetches.id"), nullable=False)
+    observed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    description_text: Mapped[str | None] = mapped_column(Text)
+    attributes_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    origin: Mapped[str | None] = mapped_column(String(255))
+    overseas_sale: Mapped[str | None] = mapped_column(String(120))
+    stock: Mapped[str | None] = mapped_column(String(255))
+    review_url: Mapped[str | None] = mapped_column(String(2048))
+    coverage: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    reason_codes_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+
+
 class Offer(Base):
     __tablename__ = "offers"
 
