@@ -33,7 +33,7 @@ Release: 1.5.1
 5. GitHub Pages remains the public read-only snapshot; the Railway URL is the private operational panel.
 6. The service must remain at one replica while SQLite and the embedded scheduler share a volume.
 
-The cloud service is fully prepared but cannot receive a public URL until the owner creates the Railway project, attaches `/data`, and sets the administrator password. These are account and secret operations that cannot be committed to a public repository.
+The Railway production service is active at `https://firsatradar-production.up.railway.app/`. Its `/data` volume is attached, the administrator credentials are stored in Railway variables, and `PORT=6767` matches the generated public-domain target port.
 
 ## Marketplace access
 
@@ -63,6 +63,10 @@ Runtime SQLite, marketplace credentials, watch targets, business cases, policy f
 - Production Docker image built successfully.
 - Container `/healthz` returned HTTP 200.
 - Container `/marketplaces` returned HTTP 401 without credentials and HTTP 200 with valid credentials.
+- Railway production deployment `7dd3fa22` became active.
+- Public Railway `/healthz` returned HTTP 200 with database status `ok`.
+- Public Railway `/` returned HTTP 401 with the `PazarRadar` Basic Auth challenge.
+- The persistent Railway volume mounted successfully and all nine database migrations ran.
 - No external product page was requested during this stage.
 
 ## Safety contract

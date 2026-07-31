@@ -10,7 +10,8 @@ Tam panel GitHub Pages üzerinde çalışamaz; Pages statik dosya sunar. Uygulam
 4. `.env.railway.example` içindeki değişkenleri servise ekle.
 5. `FIRSAT_RADAR_ADMIN_PASSWORD` için uzun ve benzersiz bir parola belirle.
 6. Servis ayarlarından herkese açık HTTPS alan adı üret.
-7. `/healthz` adresinin `status: ok` döndürdüğünü doğrula.
+7. Alan adının hedef portuyla `PORT` değişkenini aynı değere ayarla. Mevcut üretim servisi `6767` kullanır.
+8. `/healthz` adresinin `status: ok` döndürdüğünü doğrula.
 
 Servis tek replica olarak kalmalıdır. Panel ve saatlik bot aynı kalıcı veritabanını kullanır. GitHub `main` dalına gönderilen her değişiklik Railway tarafından yeniden dağıtılır.
 
