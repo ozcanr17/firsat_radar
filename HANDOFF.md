@@ -65,7 +65,9 @@ The global circuit breaker no longer stops every source.
 - `WatchlistMonitor` and `CatalogMonitor` are both source-scoped now. `CatalogMonitor` queries filter by `source_id`, and a `paginated=False` profile keeps sources whose robots.txt forbids pagination on page 1.
 - Per-source state is shown on `/marketplaces` with status, last successful scan, circuit window, and error code.
 
-This was verified live, not just in tests: in a real pipeline run Akakçe was blocked and opened its own circuit while Vatan completed successfully and the cycle still produced 12 analyses.
+The global circuit is now reserved for application-wide faults (backup, analysis, retention, unexpected exceptions). When collection runs through the isolated collector, a source failure reports `sources_degraded`, keeps backup and retention running, and leaves the global breaker closed so healthy sources are retried next cycle. The legacy single-crawler path keeps its old behavior.
+
+This was verified live, not just in tests: in a real pipeline run Akakçe was blocked and opened its own circuit while Vatan completed successfully and the cycle still produced 12 analyses. In a second run with only the blocked source enabled, the global state reported `sources_degraded` with zero consecutive failures and a closed breaker.
 
 ### Politeness and safety
 
@@ -76,6 +78,14 @@ This was verified live, not just in tests: in a real pipeline run Akakçe was bl
 - Robots policy is generic and per-source (`app/sources/robots.py`), cached per source.
 
 ## Current blockers
+
+### One stale global circuit is still open in production
+
+`/healthz` reports `scheduler_status: circuit_open`, `consecutive_failures: 2`, `circuit_open_until: 2026-08-01T20:02:00Z` (`23:02` Europe/Istanbul). This state predates this stage and is stored in the persistent Railway database.
+
+The new code will not open the global circuit for a source failure again, but it does not clear an existing one. Either wait for it to expire, or clear it once from the panel — `POST /api/v1/radar/circuit/reset`, or `python -m app.cli circuit-reset` in the Railway shell.
+
+Clearing it is safe here and is **not** the forbidden "reset against a known block": it was opened by Hepsiburada, which is now disabled and no longer in the pipeline, and the active source (Vatan) is verified allowed and reachable. Do not clear it repeatedly to retry a source that is genuinely blocked.
 
 ### Akakçe is behind Cloudflare and is currently challenged
 
