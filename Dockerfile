@@ -8,19 +8,20 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 WORKDIR /app
 
 COPY requirements.lock pyproject.toml README.md alembic.ini ./
-COPY app ./app
-COPY alembic ./alembic
 
 RUN python -m pip install --upgrade pip && \
     python -m pip install -r requirements.lock && \
-    python -m pip install --no-deps . && \
     python -m playwright install --with-deps chromium && \
     useradd --create-home --uid 10001 radar && \
     mkdir -p /data && \
     chown -R radar:radar /app /data /ms-playwright
 
-USER radar
+COPY --chown=radar:radar app ./app
+COPY --chown=radar:radar alembic ./alembic
+COPY --chown=radar:radar docker-entrypoint.sh ./docker-entrypoint.sh
+
+RUN chmod 755 /app/docker-entrypoint.sh
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

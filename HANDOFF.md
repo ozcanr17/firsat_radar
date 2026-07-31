@@ -6,7 +6,7 @@ Stage 12: Cloud control plane and multi-market foundation
 
 Status: Complete
 
-Release: 1.5.0
+Release: 1.5.1
 
 ## Delivered
 
@@ -22,6 +22,7 @@ Release: 1.5.0
 - Added schema migration `20260731_0009`.
 - Removed the Anne & Bebek-only restriction from product selection in the Esnaf Masası.
 - Added the Railway environment template and cloud deployment guide.
+- Added a Railway volume entrypoint that repairs mounted `/data` ownership before dropping privileges to the `radar` user.
 
 ## Cloud operating model
 
@@ -47,6 +48,7 @@ Targets can already be registered for every marketplace. Unsupported sources rem
 
 - Public snapshot: `https://ozcanr17.github.io/firsat_radar/`
 - Repository: `https://github.com/ozcanr17/firsat_radar`
+- Cloud panel: `https://firsatradar-production.up.railway.app/`
 - Cloud instructions: `docs/CLOUD_DEPLOYMENT.md`
 - Cloud configuration: `railway.toml`, `Dockerfile`, `.env.railway.example`
 

@@ -12,6 +12,8 @@ GitHub Pages serves the static snapshot in `site/`. The full password-protected 
 
 The repository contains a production Docker image, Railway configuration, automatic database migrations, an embedded hourly scheduler, persistent `/data` storage support, and HTTP Basic authentication. Follow [the cloud deployment guide](docs/CLOUD_DEPLOYMENT.md) once to connect the repository to Railway. Every later push to `main` is deployed from GitHub.
 
+Production domain: [firsatradar-production.up.railway.app](https://firsatradar-production.up.railway.app/)
+
 The cloud panel pages include `/marketplaces`, where Hepsiburada, Amazon Türkiye, Trendyol, and MediaMarkt Türkiye connections show their actual access state. Marketplace credentials and feed agreements are stored only as cloud secrets; they are never committed to GitHub.
 
 ## Requirements
