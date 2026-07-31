@@ -136,6 +136,7 @@ class CrawlSummary:
     reviews_created: int
     fetches_created: int
     error_code: str | None
+    listing_signature: str | None
 
 
 class SourceAccessError(RuntimeError):

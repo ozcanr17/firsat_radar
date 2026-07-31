@@ -49,6 +49,26 @@ class CrawlRun(Base):
     error_code: Mapped[str | None] = mapped_column(String(80))
 
 
+class CategoryCursor(Base):
+    __tablename__ = "category_cursors"
+    __table_args__ = (UniqueConstraint("source_id", "url"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_id: Mapped[int] = mapped_column(ForeignKey("sources.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    priority: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
+    next_page: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    page_size: Mapped[int | None] = mapped_column(Integer)
+    pages_scanned: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    sweeps_completed: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_signature: Mapped[str | None] = mapped_column(String(64))
+    last_status: Mapped[str] = mapped_column(String(40), default="pending", nullable=False)
+    last_crawled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class Fetch(Base):
     __tablename__ = "fetches"
 

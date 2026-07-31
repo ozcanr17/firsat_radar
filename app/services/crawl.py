@@ -1,3 +1,4 @@
+import hashlib
 import json
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -47,9 +48,10 @@ class CrawlService:
         self.adapter_factory = adapter_factory
         self.raw_store = RawStore(settings.data_dir / "raw")
 
-    async def policy_check(self) -> PolicyDecision:
+    async def policy_check(self, target_url: str | None = None) -> PolicyDecision:
+        url = target_url or self.settings.hepsiburada_start_url
         async with self.adapter_factory() as adapter:
-            decision = await adapter.policy_check(self.settings.hepsiburada_start_url)
+            decision = await adapter.policy_check(url)
         with self.session_factory.begin() as session:
             source = self._get_or_create_source(session)
             source.robots_checked_at = decision.checked_at
@@ -57,20 +59,32 @@ class CrawlService:
         return decision
 
     async def crawl(self, limits: CrawlLimits) -> CrawlSummary:
+        return await self.crawl_target(
+            self.settings.hepsiburada_start_url,
+            "Anne / Bebek / Oyuncak",
+            limits,
+        )
+
+    async def crawl_target(
+        self,
+        target_url: str,
+        category_name: str,
+        limits: CrawlLimits,
+    ) -> CrawlSummary:
         limits.validate()
         run_id = self._start_run()
         try:
             async with self.adapter_factory() as adapter:
-                decision = await adapter.policy_check(self.settings.hepsiburada_start_url)
+                decision = await adapter.policy_check(target_url)
                 self._record_policy(run_id, decision)
                 if not decision.allowed:
                     return self._finish_for_policy(run_id, decision)
-                listing = await adapter.discover(self.settings.hepsiburada_start_url, limits)
+                listing = await adapter.discover(target_url, limits)
                 detail_results = []
                 for product in listing.products[: limits.details]:
                     detail_results.append(await adapter.enrich(product))
                 details = tuple(detail_results)
-            return self._persist_crawl(run_id, listing, details)
+            return self._persist_crawl(run_id, listing, details, category_name)
         except SourceAccessError as error:
             return self._finish_with_error(run_id, error.status, error.error_code)
         except ParserDriftError as error:
@@ -127,6 +141,7 @@ class CrawlService:
         run_id: int,
         listing: ListingResult,
         details: tuple[ProductDetailResult, ...],
+        category_name: str,
     ) -> CrawlSummary:
         raw_path = self.raw_store.save(
             listing.raw_html,
@@ -178,7 +193,7 @@ class CrawlService:
                         external_id=stub.external_id,
                         canonical_url=stub.source_url,
                         title=stub.title,
-                        category="Anne / Bebek / Oyuncak",
+                        category=category_name,
                         image_url=stub.image_url,
                         last_fetch_id=fetch.id,
                         last_seen_at=listing.fetched_at,
@@ -304,6 +319,9 @@ class CrawlService:
                 if duplicate is not None and not details
                 else RunStatus.COMPLETED
             )
+            listing_signature = hashlib.sha256(
+                "\n".join(product.external_id for product in listing.products).encode()
+            ).hexdigest()
             return self._finish_in_session(
                 session,
                 run_id,
@@ -315,6 +333,7 @@ class CrawlService:
                 details_created=details_created,
                 reviews_created=reviews_created,
                 fetches_created=self._fetch_count(session, run_id),
+                listing_signature=listing_signature,
             )
 
     def _persist_document_fetch(
@@ -383,6 +402,7 @@ class CrawlService:
         details_created: int = 0,
         reviews_created: int = 0,
         fetches_created: int = 0,
+        listing_signature: str | None = None,
         error_code: str | None = None,
     ) -> CrawlSummary:
         summary = CrawlSummary(
@@ -396,6 +416,7 @@ class CrawlService:
             reviews_created=reviews_created,
             fetches_created=fetches_created,
             error_code=error_code,
+            listing_signature=listing_signature,
         )
         run = session.get_one(CrawlRun, run_id)
         run.status = status.value

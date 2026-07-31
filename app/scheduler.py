@@ -30,6 +30,10 @@ class CrawlOperation(Protocol):
     async def crawl(self, limits: CrawlLimits) -> CrawlSummary: ...
 
 
+class CatalogOperation(Protocol):
+    async def run_batch(self, page_count: int) -> CrawlSummary: ...
+
+
 class AnalysisOperation(Protocol):
     def analyze(self, limit: int = 60) -> AnalysisSummary: ...
 
@@ -98,6 +102,7 @@ class ScheduledPipeline:
         backup: BackupOperation,
         retention: RetentionOperation,
         runtime_state: RuntimeStateService,
+        catalog: CatalogOperation | None = None,
         sleeper: Callable[[float], Awaitable[None]] = asyncio.sleep,
         now_provider: Callable[[], datetime] | None = None,
     ) -> None:
@@ -107,6 +112,7 @@ class ScheduledPipeline:
         self.backup = backup
         self.retention = retention
         self.runtime_state = runtime_state
+        self.catalog = catalog
         self.sleeper = sleeper
         self.now_provider = now_provider or (lambda: datetime.now(UTC))
         self.lock_path = settings.data_dir / "runtime" / "scheduled-crawl.lock"
@@ -244,6 +250,9 @@ class ScheduledPipeline:
         )
         for attempt in range(1, self.settings.retry_attempts + 1):
             try:
+                if self.settings.catalog_enabled and self.catalog is not None:
+                    summary = await self.catalog.run_batch(self.settings.catalog_pages_per_run)
+                    return summary, attempt
                 return await self.crawler.crawl(limits), attempt
             except Exception:
                 if attempt >= self.settings.retry_attempts:

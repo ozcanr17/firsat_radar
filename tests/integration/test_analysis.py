@@ -156,7 +156,7 @@ async def test_analysis_is_traceable_and_idempotent(settings: Settings) -> None:
     assert "Fırsat kanıtı" in product_page.text
     assert "Fırsat radarları" in opportunities_page.text
     assert "Tarama geçmişi" in runs_page.text
-    assert "HTML dosyasını doğrudan açma" in settings_page.text
+    assert "Katalog kapsamı" in settings_page.text
     assert products_csv.status_code == 200
     assert "product_id,title" in products_csv.text
     assert opportunities_csv.status_code == 200

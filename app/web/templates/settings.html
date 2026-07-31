@@ -17,11 +17,9 @@
     </section>
     <aside class="command-card">
         <span class="section-tag light">DOĞRU ÇALIŞTIRMA</span>
-        <h2>HTML dosyasını doğrudan açma.</h2>
-        <p>Jinja şablonları ve statik stiller yalnızca FastAPI sunucusu üzerinden işlenir.</p>
-        <code>.venv/bin/python -m app.cli serve</code>
-        <p>Ardından tarayıcıda:</p>
-        <code>http://127.0.0.1:8000</code>
+        <h2>Paneli tek komutla aç.</h2>
+        <p>Komut veritabanını günceller, sunucuyu başlatır ve paneli tarayıcıda açar.</p>
+        <code>.venv/bin/python -m app.cli open-panel</code>
     </aside>
 </div>
 
@@ -37,9 +35,21 @@
     </div>
 </section>
 
+<section class="section-block">
+    <div class="section-heading"><div><span class="section-index">03</span><h2>Katalog kapsamı</h2></div><span class="status-chip status-completed"><i></i>Round-robin izleme</span></div>
+    <div class="runtime-grid">
+        <article><span>Etkin kategori</span><strong>{{ catalog.enabled_count }}</strong></article>
+        <article><span>Taranan sayfa</span><strong>{{ catalog.pages_scanned }}</strong></article>
+        <article><span>Tamamlanan tur</span><strong>{{ catalog.sweeps_completed }}</strong></article>
+        <article><span>İlk turu bekleyen</span><strong>{{ catalog.pending_count }}</strong></article>
+        <article><span>Sıradaki kategori</span><strong>{{ catalog.next_category or '—' }}</strong></article>
+        <article><span>Sıradaki sayfa</span><strong>{{ catalog.next_page or '—' }}</strong></article>
+    </div>
+</section>
+
 <section class="guardrail-grid">
-    <article><span>03</span><h3>Tek süreç</h3><p>Dosya kilidi ve scheduler aynı anda ikinci çalışmayı engeller.</p></article>
-    <article><span>04</span><h3>Otomatik duruş</h3><p>403, 429, CAPTCHA ve erişim engelinde circuit breaker açılır.</p></article>
-    <article><span>05</span><h3>Geri kazanım</h3><p>Her zamanlı çalışma öncesinde doğrulanmış SQLite yedeği alınır.</p></article>
+    <article><span>04</span><h3>Tek süreç</h3><p>Dosya kilidi ve scheduler aynı anda ikinci çalışmayı engeller.</p></article>
+    <article><span>05</span><h3>Otomatik duruş</h3><p>403, 429, CAPTCHA ve erişim engelinde circuit breaker açılır.</p></article>
+    <article><span>06</span><h3>Geri kazanım</h3><p>Her zamanlı çalışma öncesinde doğrulanmış SQLite yedeği alınır.</p></article>
 </section>
 {% endblock %}

@@ -15,6 +15,24 @@ The interval scheduler waits for the configured interval before its first job. U
 .venv/bin/python -m app.cli scheduled-run
 ```
 
+## Catalog monitoring
+
+The catalog queue contains 17 public top-level categories. Each category persists its next page, observed page size, last product signature, pages scanned, completed sweeps, and last status. The hourly scheduler processes three least-recently-crawled category pages by default.
+
+```bash
+.venv/bin/python -m app.cli catalog-seed
+.venv/bin/python -m app.cli catalog-status
+.venv/bin/python -m app.cli catalog-run --pages 1
+```
+
+Reset only the catalog cursor progress after a verified pagination change:
+
+```bash
+.venv/bin/python -m app.cli catalog-reset --confirm
+```
+
+Resetting cursors does not delete products, snapshots, reviews, fetch provenance, or raw evidence.
+
 ## Non-overlap
 
 The scheduler uses both APScheduler `max_instances=1` and an operating-system file lock at `data/runtime/scheduled-crawl.lock`. A second process records `skipped_overlap` and performs no crawl.

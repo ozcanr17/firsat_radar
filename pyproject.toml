@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "firsat-radar"
-version = "1.0.0"
+version = "1.1.0"
 description = "Local-first product opportunity radar"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"

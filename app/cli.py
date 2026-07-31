@@ -16,6 +16,7 @@ from app.domain.crawl import CrawlLimits
 from app.scheduler import ScheduledPipeline, serve_scheduler
 from app.services.analysis import AnalysisService
 from app.services.backup import DatabaseBackupService
+from app.services.catalog import CatalogMonitor
 from app.services.crawl import CrawlService
 from app.services.raw_store import RawStore
 from app.services.runtime_state import RuntimeStateService
@@ -43,6 +44,11 @@ def build_scheduled_pipeline(settings: Settings) -> tuple[ScheduledPipeline, Eng
         session_factory,
         lambda: HepsiburadaBrowserAdapter(settings),
     )
+    catalog = CatalogMonitor(
+        session_factory,
+        crawler,
+        settings.catalog_products_per_page,
+    )
     pipeline = ScheduledPipeline(
         settings=settings,
         crawler=crawler,
@@ -50,6 +56,7 @@ def build_scheduled_pipeline(settings: Settings) -> tuple[ScheduledPipeline, Eng
         backup=DatabaseBackupService(settings),
         retention=RawStore(settings.data_dir / "raw"),
         runtime_state=RuntimeStateService(session_factory),
+        catalog=catalog,
     )
     return pipeline, engine
 
@@ -146,6 +153,80 @@ def analyze(
     try:
         summary = AnalysisService(session_factory).analyze(limit_products)
         typer.echo(json.dumps(asdict(summary), ensure_ascii=False))
+    finally:
+        engine.dispose()
+
+
+@app.command("catalog-seed")
+def catalog_seed() -> None:
+    settings = Settings()
+    upgrade_database(settings)
+    service, engine = build_crawl_service(settings)
+    monitor = CatalogMonitor(
+        service.session_factory,
+        service,
+        settings.catalog_products_per_page,
+    )
+    try:
+        created = monitor.seed()
+        typer.echo(json.dumps({"created": created, **asdict(monitor.status())}, default=str))
+    finally:
+        engine.dispose()
+
+
+@app.command("catalog-status")
+def catalog_status() -> None:
+    settings = Settings()
+    upgrade_database(settings)
+    service, engine = build_crawl_service(settings)
+    monitor = CatalogMonitor(
+        service.session_factory,
+        service,
+        settings.catalog_products_per_page,
+    )
+    try:
+        typer.echo(json.dumps(asdict(monitor.status()), ensure_ascii=False, default=str))
+    finally:
+        engine.dispose()
+
+
+@app.command("catalog-run")
+def catalog_run(
+    pages: int = typer.Option(1, min=1, max=10),
+) -> None:
+    settings = Settings()
+    upgrade_database(settings)
+    service, engine = build_crawl_service(settings)
+    monitor = CatalogMonitor(
+        service.session_factory,
+        service,
+        settings.catalog_products_per_page,
+    )
+    try:
+        summary = asyncio.run(monitor.run_batch(pages))
+        output = asdict(summary)
+        output["status"] = summary.status.value
+        typer.echo(json.dumps(output, ensure_ascii=False))
+    finally:
+        engine.dispose()
+
+
+@app.command("catalog-reset")
+def catalog_reset(
+    confirm: bool = typer.Option(False, "--confirm"),
+) -> None:
+    if not confirm:
+        raise typer.BadParameter("Use --confirm to reset catalog cursors")
+    settings = Settings()
+    upgrade_database(settings)
+    service, engine = build_crawl_service(settings)
+    monitor = CatalogMonitor(
+        service.session_factory,
+        service,
+        settings.catalog_products_per_page,
+    )
+    try:
+        typer.echo(json.dumps({"reset": monitor.reset_progress()}))
     finally:
         engine.dispose()
 

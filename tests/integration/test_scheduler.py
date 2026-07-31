@@ -28,6 +28,16 @@ class FakeCrawler:
         return outcome
 
 
+class FakeCatalog:
+    def __init__(self, outcome: CrawlSummary) -> None:
+        self.outcome = outcome
+        self.page_counts: list[int] = []
+
+    async def run_batch(self, page_count: int) -> CrawlSummary:
+        self.page_counts.append(page_count)
+        return self.outcome
+
+
 class FakeAnalyzer:
     def __init__(self) -> None:
         self.calls = 0
@@ -87,12 +97,14 @@ def crawl_summary(status: RunStatus, error_code: str | None = None) -> CrawlSumm
         reviews_created=1,
         fetches_created=4,
         error_code=error_code,
+        listing_signature="a" * 64,
     )
 
 
 def build_pipeline(
     settings: Settings,
     crawler: FakeCrawler,
+    catalog: FakeCatalog | None = None,
 ) -> tuple[
     ScheduledPipeline,
     RuntimeStateService,
@@ -121,6 +133,7 @@ def build_pipeline(
         backup,
         retention,
         runtime,
+        catalog=catalog,
         sleeper=sleeper,
         now_provider=lambda: datetime(2026, 7, 31, tzinfo=UTC),
     )
@@ -155,6 +168,21 @@ async def test_pipeline_retries_transient_exception_then_completes(settings: Set
     assert state.consecutive_failures == 0
     assert state.last_backup_at is not None
     assert state.last_retention_at is not None
+    engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_pipeline_uses_bounded_catalog_batch(settings: Settings) -> None:
+    crawler = FakeCrawler([crawl_summary(RunStatus.FAILED)])
+    catalog = FakeCatalog(crawl_summary(RunStatus.COMPLETED))
+    pipeline, _, analyzer, _, _, _, engine = build_pipeline(settings, crawler, catalog)
+
+    result = await pipeline.run()
+
+    assert result.status == "completed"
+    assert catalog.page_counts == [settings.catalog_pages_per_run]
+    assert crawler.calls == 0
+    assert analyzer.calls == 1
     engine.dispose()
 
 

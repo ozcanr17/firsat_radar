@@ -47,3 +47,15 @@ Add non-overlapping scheduling, retries, circuit breaker, retention, backups, an
 Status: Complete.
 
 Run the opt-in live smoke test, full quality checks, UI verification, and final documentation.
+
+## Stage 8: Continuous catalog monitoring
+
+Status: Complete.
+
+Add persistent category cursors, bounded round-robin page traversal, repeated-page detection, catalog progress reporting, scheduler integration, and operational commands.
+
+## Stage 9: Product freshness and detail queue
+
+Status: Ready.
+
+Prioritize stale and high-signal products for detail and public-review refresh without coupling expensive detail navigation to broad catalog discovery.

@@ -10,6 +10,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.config import Settings
 from app.db.session import SessionFactory
+from app.services.catalog import CatalogMonitor
 from app.services.dashboard import get_dashboard_stats
 from app.services.opportunities import OpportunityView, list_latest_opportunities
 from app.services.product_detail import get_product_page
@@ -139,6 +140,7 @@ def create_web_router(settings: Settings, session_factory: SessionFactory) -> AP
 
     @router.get("/settings", response_class=HTMLResponse, name="settings_page")
     def settings_page(request: Request) -> HTMLResponse:
+        catalog = CatalogMonitor(session_factory, None, settings.catalog_products_per_page)
         context = shared_context(request, "settings")
         context.update(
             {
@@ -156,6 +158,10 @@ def create_web_router(settings: Settings, session_factory: SessionFactory) -> AP
                     ("Robots önbelleği", f"{settings.robots_cache_hours} saat"),
                     ("Zamanlama aralığı", f"{settings.scheduler_interval_hours} saat"),
                     (
+                        "Katalog taraması",
+                        f"Çalışma başına {settings.catalog_pages_per_run} kategori sayfası",
+                    ),
+                    (
                         "Zamanlı kapsam",
                         f"{settings.scheduler_products} ürün / {settings.scheduler_details} detay",
                     ),
@@ -170,6 +176,7 @@ def create_web_router(settings: Settings, session_factory: SessionFactory) -> AP
                     ("Veri dizini", str(settings.data_dir.resolve())),
                 ),
                 "runtime": RuntimeStateService(session_factory).get(),
+                "catalog": catalog.status(),
             }
         )
         return templates.TemplateResponse(request=request, name="settings.html", context=context)
