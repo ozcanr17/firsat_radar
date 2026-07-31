@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import ROUND_HALF_UP, Decimal
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy import select
 
@@ -9,10 +9,14 @@ from app.db.models import BusinessCase, Product, WatchTarget
 from app.db.session import SessionFactory
 from app.services.marketplaces import MARKETPLACE_BY_KEY
 from app.services.products import ProductView, list_latest_products
+from app.sources.amazon_tr.parser import extract_asin
 from app.sources.hepsiburada.parser import extract_external_id
 
 MONEY = Decimal("0.01")
 ALLOWED_TARGET_TYPES = {"product", "category"}
+ALLOWED_QUERY_KEYS = {
+    "amazon_tr": {"node"},
+}
 
 
 @dataclass(frozen=True)
@@ -107,7 +111,15 @@ def normalize_marketplace_url(source_name: str, value: str) -> str:
         raise ValueError("forbidden_target_url")
     if source_name == "hepsiburada" and parsed.path.startswith("/product-comment/"):
         raise ValueError("forbidden_target_url")
-    return urlunsplit(("https", expected_hostname, parsed.path.rstrip("/") or "/", "", ""))
+    allowed_keys = ALLOWED_QUERY_KEYS.get(source_name, set())
+    query = urlencode(
+        [
+            (key, query_value)
+            for key, query_value in parse_qsl(parsed.query, keep_blank_values=False)
+            if key in allowed_keys
+        ]
+    )
+    return urlunsplit(("https", expected_hostname, parsed.path.rstrip("/") or "/", query, ""))
 
 
 def add_watch_target(
@@ -137,6 +149,13 @@ def add_watch_target(
         and source_name == "hepsiburada"
         and source_url is not None
         and extract_external_id(source_url) is None
+    ):
+        raise ValueError("invalid_product_url")
+    if (
+        target_type == "product"
+        and source_name == "amazon_tr"
+        and source_url is not None
+        and extract_asin(source_url) is None
     ):
         raise ValueError("invalid_product_url")
     category = target.category.strip() if target.category else None

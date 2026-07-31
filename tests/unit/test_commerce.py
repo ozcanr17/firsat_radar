@@ -58,6 +58,13 @@ def test_multimarket_urls_are_canonicalized_to_registered_hosts() -> None:
         == "https://www.amazon.com.tr/example"
     )
     assert (
+        normalize_marketplace_url(
+            "amazon_tr",
+            "https://www.amazon.com.tr/gp/browse.html?node=12466208031&ref_=nav_baby",
+        )
+        == "https://www.amazon.com.tr/gp/browse.html?node=12466208031"
+    )
+    assert (
         normalize_marketplace_url("trendyol", "https://www.trendyol.com/example#reviews")
         == "https://www.trendyol.com/example"
     )

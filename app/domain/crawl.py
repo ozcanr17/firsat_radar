@@ -70,6 +70,12 @@ class ProductStub:
 
 
 @dataclass(frozen=True)
+class CategoryLink:
+    label: str
+    url: str
+
+
+@dataclass(frozen=True)
 class ListingResult:
     url: str
     fetched_at: datetime
@@ -80,6 +86,7 @@ class ListingResult:
     candidate_count: int
     coverage: float
     parser_version: str
+    category_links: tuple[CategoryLink, ...] = ()
 
 
 @dataclass(frozen=True)

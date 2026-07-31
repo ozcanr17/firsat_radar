@@ -2,11 +2,11 @@
 
 ## Current stage
 
-Stage 13: Unified Radar Center and continuous discovery
+Stage 14: Marketplace-aware category traversal
 
 Status: Complete
 
-Release: 1.6.0
+Release: 1.7.0
 
 ## Delivered
 
@@ -27,16 +27,26 @@ Release: 1.6.0
 - Added a new product snapshot on every tracked product refresh.
 - Preserved the previous listing values when product structured data omits a field.
 - Kept analysis, retention, backup, non-overlap, circuit breaker, quota, and policy gates in the same cycle.
+- Fixed the Radar Center quick-target form so it no longer sends every URL as Hepsiburada.
+- Added a marketplace selector and automatic marketplace detection for pasted URLs.
+- Preserved Amazon Türkiye `node` browse identity while removing tracking parameters.
+- Added Amazon ASIN validation for product targets.
+- Added a source-aware crawler registry to the watchlist monitor.
+- Added a generic category-link result contract shared by source adapters.
+- Added bounded child-category discovery with URL deduplication, 12 children per page, and a three-level depth limit.
+- Added Hepsiburada child-category extraction for permitted category pages.
+- Kept Amazon targets registered but paused until Creators API credentials or written automation permission is connected.
 
 ## Operating model
 
 1. Railway starts the authenticated FastAPI service and migrates the persistent database.
 2. The embedded scheduler queues an immediate guarded cycle, then runs hourly.
-3. Up to three due watch targets are discovered or refreshed.
-4. Three pages from prioritized category agents are scanned in round-robin order.
-5. Visible product facts and reviews are persisted as evidence.
-6. Opportunity and review analysis runs after collection.
-7. The Radar Center shows the new state and allows an additional manual cycle.
+3. Up to three due watch targets are routed to their marketplace connector and refreshed.
+4. Permitted category pages create a bounded queue of deduplicated child categories.
+5. Three pages from prioritized category agents are scanned in round-robin order.
+6. Visible product facts and reviews are persisted as evidence.
+7. Opportunity and review analysis runs after collection.
+8. The Radar Center shows the new state and allows an additional manual cycle.
 
 The unified control page is `https://firsatradar-production.up.railway.app/`. Detailed pages remain available for products, opportunities, recommendations, profitability, marketplaces, runs, and settings.
 
@@ -48,16 +58,19 @@ The unified control page is `https://firsatradar-production.up.railway.app/`. De
 - Requests remain sequential with a 6–12 second interval and an 800 request daily cap.
 - The collector stops on policy denial, HTTP 403, HTTP 429, CAPTCHA, security pages, and parser drift.
 - No proxy rotation, hidden API, authentication bypass, CAPTCHA bypass, or access-control bypass is implemented.
-- Amazon Türkiye, Trendyol, and MediaMarkt remain inactive until official credentials or approved feeds are connected.
+- Amazon browse targets are accepted and retain their node ID, but automated public-page traversal remains inactive until Creators API credentials or written permission is connected.
+- Trendyol and MediaMarkt remain inactive until official credentials or approved feeds are connected.
 
 ## Verification
 
 - Ruff lint passed.
 - Ruff format passed.
 - Mypy strict mode passed.
-- Pytest passed: 53 tests.
+- Pytest passed: 58 tests.
 - Desktop Radar Center layout was visually verified in the in-app browser.
-- Mobile Radar Center layout was visually verified at 390 × 844.
+- Amazon URL auto-detection was verified in the rendered Radar Center.
+- Amazon browse-node normalization and restricted queue state are covered by integration tests.
+- Child-category extraction and persistence are covered by unit and integration tests.
 - Product URL discovery and watch-target linking are covered by integration tests.
 - Watchlist and catalog execution in the same scheduler cycle are covered by integration tests.
 - Radar status and category management APIs are covered by integration tests.
@@ -74,4 +87,4 @@ Runtime databases, raw evidence, browser state, credentials, watch targets, and 
 
 ## Next stage
 
-Stage 14 should add durable notification channels, cross-market product identity, official Amazon Creators API ingestion, approved Trendyol and MediaMarkt feeds, category-level trend briefs, and acquisition or local-production validation workflows.
+Stage 15 should add durable notification channels, cross-market product identity, official Amazon Creators API ingestion, approved Trendyol and MediaMarkt feeds, category-level trend briefs, and acquisition or local-production validation workflows.

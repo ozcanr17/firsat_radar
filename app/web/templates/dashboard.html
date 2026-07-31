@@ -36,11 +36,12 @@
     </article>
 
     <article class="radar-target">
-        <div><span class="section-tag">HIZLI HEDEF</span><h2>Ürün veya kategori ekle</h2><p>Herkese açık bir Hepsiburada ürün ya da kategori adresini radar kuyruğuna ekle.</p></div>
+        <div><span class="section-tag">HIZLI HEDEF</span><h2>Ürün veya kategori ekle</h2><p>Mağazayı seç veya adresi yapıştır; Radar doğru bağlantıyı tanıyıp erişim durumunu gösterir.</p></div>
         <form id="quick-target-form" class="quick-target-form">
+            <select name="source_name" aria-label="Pazar yeri">{% for marketplace in marketplaces %}<option value="{{ marketplace.key }}">{{ marketplace.label }}</option>{% endfor %}</select>
             <select name="target_type" aria-label="Hedef türü"><option value="product">Ürün</option><option value="category">Kategori</option></select>
             <input name="label" maxlength="500" required placeholder="Araştırma başlığı">
-            <input name="source_url" type="url" required placeholder="https://www.hepsiburada.com/…">
+            <input name="source_url" type="url" required placeholder="https://www.amazon.com.tr/…">
             <button type="submit">Radara ekle</button>
         </form>
         <p class="radar-action-status" id="target-status" role="status"></p>
@@ -162,6 +163,25 @@ const radarStatus = document.querySelector("#radar-status")
 const targetForm = document.querySelector("#quick-target-form")
 const targetStatus = document.querySelector("#target-status")
 
+function sourceFromUrl(value) {
+    try {
+        const hostname = new URL(value).hostname.replace(/^www\./, "")
+        return {
+            "hepsiburada.com": "hepsiburada",
+            "amazon.com.tr": "amazon_tr",
+            "trendyol.com": "trendyol",
+            "mediamarkt.com.tr": "mediamarkt_tr"
+        }[hostname] ?? null
+    } catch {
+        return null
+    }
+}
+
+targetForm.elements.source_url.addEventListener("input", event => {
+    const sourceName = sourceFromUrl(event.target.value)
+    if (sourceName) targetForm.elements.source_name.value = sourceName
+})
+
 radarButton.addEventListener("click", async () => {
     radarButton.disabled = true
     radarButton.textContent = "Başlatılıyor…"
@@ -180,7 +200,7 @@ targetForm.addEventListener("submit", async event => {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
-            source_name: "hepsiburada",
+            source_name: values.source_name,
             target_type: values.target_type,
             label: values.label,
             source_url: values.source_url,
@@ -190,7 +210,11 @@ targetForm.addEventListener("submit", async event => {
         })
     })
     const body = await response.json()
-    targetStatus.textContent = response.ok ? "Hedef radara eklendi." : `Eklenemedi: ${body.detail}`
+    targetStatus.textContent = response.ok
+        ? body.access_state === "credentials_required"
+            ? "Hedef kaydedildi. Otomatik tarama için yetkili Amazon erişimi gerekiyor."
+            : "Hedef radara eklendi."
+        : `Eklenemedi: ${body.detail}`
     if (response.ok) window.setTimeout(() => window.location.reload(), 700)
 })
 

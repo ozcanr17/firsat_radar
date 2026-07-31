@@ -3,12 +3,11 @@ from datetime import UTC, datetime
 
 from sqlalchemy import select
 
-from app.db.models import Product, WatchTarget
+from app.db.models import Product, Source, WatchTarget
 from app.db.session import SessionFactory
 from app.domain.crawl import CrawlLimits, CrawlSummary, RunStatus
 from app.services.commerce import list_watch_targets
 from app.services.crawl import CrawlService
-from app.sources.hepsiburada.parser import extract_external_id
 
 
 @dataclass(frozen=True)
@@ -33,9 +32,11 @@ class WatchlistMonitor:
         self,
         session_factory: SessionFactory,
         crawler: CrawlService,
+        crawlers: dict[str, CrawlService] | None = None,
     ) -> None:
         self.session_factory = session_factory
         self.crawler = crawler
+        self.crawlers = {crawler.source_name: crawler, **(crawlers or {})}
 
     async def refresh_due(self, limit: int = 3) -> WatchlistRefreshSummary:
         if not 1 <= limit <= 10:
@@ -48,22 +49,36 @@ class WatchlistMonitor:
         items = []
         stopped = False
         for target in due:
+            crawler = self.crawlers.get(target.source_name)
+            if crawler is None:
+                self._mark_target(target.id, RunStatus.FAILED.value, datetime.now(UTC))
+                items.append(
+                    WatchlistRefreshItem(
+                        target_id=target.id,
+                        product_id=target.product_id,
+                        label=target.label,
+                        status=RunStatus.FAILED.value,
+                        error_code="connector_unavailable",
+                    )
+                )
+                stopped = True
+                break
             if target.product_id is not None:
-                summary = await self.crawler.refresh_product(target.product_id)
+                summary = await crawler.refresh_product(target.product_id)
             elif target.target_type == "product" and target.source_url is not None:
-                summary = await self.crawler.discover_product(
+                summary = await crawler.discover_product(
                     target.source_url,
                     target.label,
                     target.category,
                 )
-                self._link_product(target.id, target.source_url)
+                self._link_product(target.id, target.source_url, crawler)
             elif target.source_url is not None:
-                summary = await self.crawler.crawl_target(
+                summary = await crawler.crawl_target(
                     target.source_url,
                     target.category or target.label,
                     CrawlLimits(
-                        products=self.crawler.settings.catalog_products_per_page,
-                        details=self.crawler.settings.catalog_details_per_page,
+                        products=crawler.settings.catalog_products_per_page,
+                        details=crawler.settings.catalog_details_per_page,
                     ),
                 )
             else:
@@ -118,13 +133,26 @@ class WatchlistMonitor:
             target.last_status = status
             target.last_checked_at = checked_at
 
-    def _link_product(self, target_id: int, source_url: str) -> None:
-        external_id = extract_external_id(source_url)
+    def _link_product(
+        self,
+        target_id: int,
+        source_url: str,
+        crawler: CrawlService,
+    ) -> None:
+        external_id = crawler.external_id_extractor(source_url)
         if external_id is None:
             return
         with self.session_factory.begin() as session:
             target = session.get_one(WatchTarget, target_id)
-            product = session.scalar(select(Product).where(Product.external_id == external_id))
+            source = session.scalar(select(Source).where(Source.name == crawler.source_name))
+            if source is None:
+                return
+            product = session.scalar(
+                select(Product).where(
+                    Product.source_id == source.id,
+                    Product.external_id == external_id,
+                )
+            )
             if product is not None:
                 target.product_id = product.id
 

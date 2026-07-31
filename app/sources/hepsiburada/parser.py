@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
-from app.domain.crawl import ParserDriftError, ProductStub
+from app.domain.crawl import CategoryLink, ParserDriftError, ProductStub
 
 PRODUCT_CODE_PATTERN = re.compile(r"-(?:p|pm)-([A-Z0-9]+)", re.IGNORECASE)
 PRICE_PATTERN = re.compile(r"fiyat:\s*([\d.]+(?:,\d{1,2})?)\s*TL", re.IGNORECASE)
@@ -21,6 +21,12 @@ class RenderedProductCard:
     visible_text: str
     image_url: str | None
     delivery_text: str | None
+
+
+@dataclass(frozen=True)
+class RenderedCategoryLink:
+    href: str
+    label: str
 
 
 def normalize_url(base_url: str, href: str) -> str:
@@ -55,6 +61,29 @@ def parse_rating(value: str) -> tuple[float | None, int | None]:
 def extract_external_id(url: str) -> str | None:
     match = PRODUCT_CODE_PATTERN.search(url)
     return match.group(1).upper() if match else None
+
+
+def parse_category_links(
+    links: list[RenderedCategoryLink],
+    base_url: str,
+    current_url: str,
+    limit: int = 12,
+) -> tuple[CategoryLink, ...]:
+    normalized_current = normalize_url(base_url, current_url)
+    results: list[CategoryLink] = []
+    seen = {normalized_current}
+    for link in links:
+        label = " ".join(link.label.split())
+        url = normalize_url(base_url, link.href)
+        hostname = (urlsplit(url).hostname or "").removeprefix("www.")
+        path = urlsplit(url).path
+        if not label or hostname != "hepsiburada.com" or "-c-" not in path or url in seen:
+            continue
+        seen.add(url)
+        results.append(CategoryLink(label=label[:255], url=url))
+        if len(results) >= limit:
+            break
+    return tuple(results)
 
 
 def card_to_product(

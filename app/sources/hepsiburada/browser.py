@@ -31,7 +31,12 @@ from app.sources.hepsiburada.detail_parser import (
     parse_product_detail,
     parse_reviews,
 )
-from app.sources.hepsiburada.parser import RenderedProductCard, parse_cards
+from app.sources.hepsiburada.parser import (
+    RenderedCategoryLink,
+    RenderedProductCard,
+    parse_cards,
+    parse_category_links,
+)
 from app.sources.hepsiburada.policy import RobotsPolicy
 
 BASE_URL = "https://www.hepsiburada.com"
@@ -117,7 +122,7 @@ class HepsiburadaBrowserAdapter:
         try:
             response = await page.goto(start_url, wait_until="domcontentloaded")
             await page.wait_for_selector(
-                f"{PRODUCT_CARD_SELECTOR} {PRODUCT_LINK_SELECTOR}",
+                (f"{PRODUCT_CARD_SELECTOR} {PRODUCT_LINK_SELECTOR}, main a[href*='-c-']"),
                 state="attached",
                 timeout=self.settings.browser_navigation_timeout_seconds * 1000,
             )
@@ -166,7 +171,28 @@ class HepsiburadaBrowserAdapter:
             )
             for card in card_payloads
         ]
-        products, coverage = parse_cards(cards, BASE_URL, limits.products)
+        raw_category_links = await page.locator("main a[href*='-c-']").evaluate_all(
+            """
+            links => links.map(link => ({
+                href: link.href,
+                label: link.innerText || link.getAttribute("aria-label") || ""
+            }))
+            """
+        )
+        category_links = parse_category_links(
+            [
+                RenderedCategoryLink(href=str(link["href"]), label=str(link["label"]))
+                for link in cast(list[dict[str, Any]], raw_category_links)
+            ],
+            BASE_URL,
+            page.url,
+        )
+        if cards:
+            products, coverage = parse_cards(cards, BASE_URL, limits.products)
+        elif category_links:
+            products, coverage = (), 1.0
+        else:
+            products, coverage = parse_cards(cards, BASE_URL, limits.products)
         raw_html = await page.content()
         return ListingResult(
             url=page.url,
@@ -178,6 +204,7 @@ class HepsiburadaBrowserAdapter:
             candidate_count=min(len(cards), limits.products),
             coverage=coverage,
             parser_version=PARSER_VERSION,
+            category_links=category_links,
         )
 
     async def enrich(self, product: ProductStub) -> ProductDetailResult:

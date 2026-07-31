@@ -16,6 +16,7 @@ from app.db.models import (
     ProductSnapshot,
     Review,
     Source,
+    WatchTarget,
 )
 from app.db.session import SessionFactory
 from app.domain.crawl import (
@@ -44,14 +45,27 @@ class CrawlService:
         settings: Settings,
         session_factory: SessionFactory,
         adapter_factory: AdapterFactory,
+        *,
+        source_name: str = "hepsiburada",
+        source_base_url: str = "https://www.hepsiburada.com",
+        robots_url: str = "https://www.hepsiburada.com/robots.txt",
+        start_url: str | None = None,
+        start_category: str = "Anne / Bebek / Oyuncak",
+        external_id_extractor: Callable[[str], str | None] = extract_external_id,
     ) -> None:
         self.settings = settings
         self.session_factory = session_factory
         self.adapter_factory = adapter_factory
         self.raw_store = RawStore(settings.data_dir / "raw")
+        self.source_name = source_name
+        self.source_base_url = source_base_url
+        self.robots_url = robots_url
+        self.start_url = start_url or settings.hepsiburada_start_url
+        self.start_category = start_category
+        self.external_id_extractor = external_id_extractor
 
     async def policy_check(self, target_url: str | None = None) -> PolicyDecision:
-        url = target_url or self.settings.hepsiburada_start_url
+        url = target_url or self.start_url
         async with self.adapter_factory() as adapter:
             decision = await adapter.policy_check(url)
         with self.session_factory.begin() as session:
@@ -62,8 +76,8 @@ class CrawlService:
 
     async def crawl(self, limits: CrawlLimits) -> CrawlSummary:
         return await self.crawl_target(
-            self.settings.hepsiburada_start_url,
-            "Anne / Bebek / Oyuncak",
+            self.start_url,
+            self.start_category,
             limits,
         )
 
@@ -143,11 +157,11 @@ class CrawlService:
         label: str,
         category: str | None,
     ) -> CrawlSummary:
-        external_id = extract_external_id(source_url)
+        external_id = self.external_id_extractor(source_url)
         if external_id is None:
             raise ValueError("invalid_product_url")
         with self.session_factory() as session:
-            source = session.scalar(select(Source).where(Source.name == "hepsiburada"))
+            source = session.scalar(select(Source).where(Source.name == self.source_name))
             product = (
                 session.scalar(
                     select(Product).where(
@@ -218,7 +232,7 @@ class CrawlService:
             session.add(
                 Fetch(
                     run_id=run_id,
-                    url="https://www.hepsiburada.com/robots.txt",
+                    url=self.robots_url,
                     fetched_at=decision.checked_at,
                     status_code=decision.status_code,
                     content_hash=decision.content_hash,
@@ -266,6 +280,7 @@ class CrawlService:
                 debug_metadata_json=json.dumps(
                     {
                         "candidate_count": listing.candidate_count,
+                        "category_link_count": len(listing.category_links),
                         "raw_path": str(raw_path),
                         "selector": "main article",
                     }
@@ -274,6 +289,7 @@ class CrawlService:
             session.add(fetch)
             session.flush()
             source_id = session.get_one(CrawlRun, run_id).source_id
+            self._persist_category_links(session, listing, category_name)
             products_created = 0
             products_updated = 0
             snapshots_created = 0
@@ -643,6 +659,30 @@ class CrawlService:
         status = status_by_state.get(decision.state, RunStatus.FAILED)
         return self._finish_with_error(run_id, status, decision.reason_code or status.value)
 
+    def _persist_category_links(
+        self,
+        session: Session,
+        listing: ListingResult,
+        category_name: str,
+    ) -> None:
+        if category_name.count(" > ") >= 2:
+            return
+        for link in listing.category_links[:12]:
+            existing = session.scalar(select(WatchTarget).where(WatchTarget.source_url == link.url))
+            if existing is not None:
+                continue
+            session.add(
+                WatchTarget(
+                    source_name=self.source_name,
+                    target_type="category",
+                    label=link.label,
+                    source_url=link.url,
+                    category=f"{category_name} > {link.label}",
+                    priority=4,
+                    refresh_interval_hours=72,
+                )
+            )
+
     def _finish_with_error(
         self,
         run_id: int,
@@ -708,11 +748,11 @@ class CrawlService:
         return len(session.scalars(select(Fetch.id).where(Fetch.run_id == run_id)).all())
 
     def _get_or_create_source(self, session: Session) -> Source:
-        source = session.scalar(select(Source).where(Source.name == "hepsiburada"))
+        source = session.scalar(select(Source).where(Source.name == self.source_name))
         if source is None:
             source = Source(
-                name="hepsiburada",
-                base_url="https://www.hepsiburada.com",
+                name=self.source_name,
+                base_url=self.source_base_url,
                 enabled=True,
                 policy_state="unknown",
             )

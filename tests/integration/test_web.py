@@ -98,6 +98,31 @@ async def test_trade_desk_and_watchlist_api(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_amazon_category_target_preserves_browse_node(client: AsyncClient) -> None:
+    created = await client.post(
+        "/api/v1/watchlist",
+        json={
+            "source_name": "amazon_tr",
+            "target_type": "category",
+            "label": "Amazon Bebek",
+            "source_url": (
+                "https://www.amazon.com.tr/gp/browse.html?node=12466208031&ref_=nav_em_ba_babyall"
+            ),
+            "priority": 5,
+            "refresh_interval_hours": 24,
+        },
+    )
+
+    assert created.status_code == 201
+    assert created.json()["source_name"] == "amazon_tr"
+    assert created.json()["source_url"] == (
+        "https://www.amazon.com.tr/gp/browse.html?node=12466208031"
+    )
+    assert created.json()["access_state"] == "credentials_required"
+    assert created.json()["refresh_due"] is False
+
+
+@pytest.mark.asyncio
 async def test_marketplace_control_center_lists_connector_states(client: AsyncClient) -> None:
     page = await client.get("/marketplaces")
     response = await client.get("/api/v1/marketplaces")

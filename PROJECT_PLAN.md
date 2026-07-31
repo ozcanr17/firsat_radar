@@ -78,7 +78,19 @@ Status: Complete.
 
 Package the full panel, persistent database, background scheduler, authentication, and browser runtime for GitHub-connected cloud deployment. Add an honest marketplace registry, multi-store watch targets, connector status UI, and an operator deployment guide.
 
-## Stage 13: Official marketplace connectors and category briefs
+## Stage 13: Unified Radar Center and continuous discovery
+
+Status: Complete.
+
+Unify live operations on the Radar Center, start guarded cycles immediately and hourly, combine watch targets with popular-category rotation, and expose agent, queue, coverage, opportunity, and product state.
+
+## Stage 14: Marketplace-aware category traversal
+
+Status: Complete.
+
+Recognize marketplace URLs in the quick-target workflow, preserve Amazon browse-node identity, route watch targets by source connector, and create bounded, deduplicated child-category targets from permitted category pages. Keep restricted connectors paused instead of bypassing access or contractual limits.
+
+## Stage 15: Official marketplace connectors and category briefs
 
 Status: Requires external access.
 

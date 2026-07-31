@@ -115,6 +115,7 @@ def create_web_router(settings: Settings, session_factory: SessionFactory) -> AP
                 "scheduler_enabled": settings.embedded_scheduler_enabled,
                 "catalog_enabled": settings.catalog_enabled,
                 "scheduler_interval_hours": settings.scheduler_interval_hours,
+                "marketplaces": MARKETPLACES,
             }
         )
         return templates.TemplateResponse(request=request, name="dashboard.html", context=context)

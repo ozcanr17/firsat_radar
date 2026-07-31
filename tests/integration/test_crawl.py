@@ -20,6 +20,7 @@ from app.db.models import (
 )
 from app.db.session import build_engine, build_session_factory
 from app.domain.crawl import (
+    CategoryLink,
     CrawlLimits,
     FetchedDocument,
     ListingResult,
@@ -106,6 +107,36 @@ def build_listing() -> ListingResult:
     )
 
 
+def build_listing_with_categories() -> ListingResult:
+    listing = build_listing()
+    return ListingResult(
+        **{
+            **listing.__dict__,
+            "category_links": (
+                CategoryLink(
+                    label="Bebek Arabaları",
+                    url="https://www.hepsiburada.com/bebek-arabalari-c-600001",
+                ),
+                CategoryLink(
+                    label="Bebek Gıdaları",
+                    url="https://www.hepsiburada.com/bebek-gidalari-c-600002",
+                ),
+            ),
+        }
+    )
+
+
+def build_category_only_listing() -> ListingResult:
+    listing = build_listing_with_categories()
+    return ListingResult(
+        **{
+            **listing.__dict__,
+            "products": (),
+            "candidate_count": 0,
+        }
+    )
+
+
 def build_detail() -> ProductDetailResult:
     observed_at = datetime.now(UTC)
     canonical_url = "https://www.hepsiburada.com/canli-urun-p-HBCV0000000001"
@@ -188,6 +219,54 @@ async def test_crawl_is_idempotent(settings: Settings) -> None:
         assert response.status_code == 200
         assert response.json()["count"] == 1
         assert response.json()["items"][0]["fetch_id"] == 2
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_category_discovery_creates_bounded_child_watch_targets(settings: Settings) -> None:
+    upgrade_database(settings)
+    engine = build_engine(settings)
+    session_factory = build_session_factory(engine)
+    service = CrawlService(
+        settings,
+        session_factory,
+        lambda: FakeAdapter(build_listing_with_categories()),
+    )
+    try:
+        result = await service.crawl(CrawlLimits(products=20))
+
+        with session_factory() as session:
+            targets = session.scalars(select(WatchTarget).order_by(WatchTarget.id)).all()
+
+        assert result.status is RunStatus.COMPLETED
+        assert [target.label for target in targets] == ["Bebek Arabaları", "Bebek Gıdaları"]
+        assert targets[0].category == "Anne / Bebek / Oyuncak > Bebek Arabaları"
+        assert targets[0].source_name == "hepsiburada"
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_category_only_page_can_expand_without_product_cards(settings: Settings) -> None:
+    upgrade_database(settings)
+    engine = build_engine(settings)
+    session_factory = build_session_factory(engine)
+    service = CrawlService(
+        settings,
+        session_factory,
+        lambda: FakeAdapter(build_category_only_listing()),
+    )
+    try:
+        result = await service.crawl(CrawlLimits(products=20))
+
+        with session_factory() as session:
+            target_count = session.scalar(select(func.count()).select_from(WatchTarget))
+            product_count = session.scalar(select(func.count()).select_from(Product))
+
+        assert result.status is RunStatus.COMPLETED
+        assert target_count == 2
+        assert product_count == 0
     finally:
         engine.dispose()
 

@@ -44,11 +44,13 @@ MARKETPLACES = (
         key="amazon_tr",
         label="Amazon Türkiye",
         base_url="https://www.amazon.com.tr",
-        access_mode="Amazon Creators API",
+        access_mode="Resmî API veya yazılı izin",
         access_state="credentials_required",
-        state_label="Kimlik bilgisi gerekli",
-        description="Resmî erişim yolu belirlendi; bağlayıcı ve hesap anahtarı bekleniyor.",
-        requirement="Amazon Associates uygunluğu ve Creators API kimlik bilgileri gerekir.",
+        state_label="Yetkili erişim gerekli",
+        description=(
+            "Kategori hedefi ve düğüm kimliği kaydedilir; izinsiz sayfa robotu çalıştırılmaz."
+        ),
+        requirement="Creators API kimlik bilgisi veya Amazon'dan yazılı otomasyon izni gerekir.",
         documentation_url="https://affiliate-program.amazon.com/creatorsapi/docs/en-us/introduction",
         capabilities=("Ürün arama", "Ürün detayları", "Kategori düğümleri"),
     ),
