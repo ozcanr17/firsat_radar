@@ -157,6 +157,7 @@ class Review(Base):
 
 class ReviewLabel(Base):
     __tablename__ = "review_labels"
+    __table_args__ = (UniqueConstraint("review_id", "topic"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     review_id: Mapped[int] = mapped_column(ForeignKey("reviews.id"), nullable=False)
@@ -169,6 +170,7 @@ class ReviewLabel(Base):
 
 class Analysis(Base):
     __tablename__ = "analyses"
+    __table_args__ = (UniqueConstraint("product_id", "fetch_id", "model_version"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), nullable=False)
@@ -187,6 +189,7 @@ class Analysis(Base):
 
 class Opportunity(Base):
     __tablename__ = "opportunities"
+    __table_args__ = (UniqueConstraint("analysis_id"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), nullable=False)

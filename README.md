@@ -4,7 +4,7 @@ Firsat Radar is a local-first product opportunity research application planned a
 
 ## Current status
 
-Stage 3 is complete. The application performs a policy-gated, single-tab browser crawl of the public Hepsiburada Anne, Bebek, Oyuncak listing, enriches a strictly limited product set, and stores identity-minimized public reviews without restricted endpoints.
+Stage 4 is complete. The application performs policy-gated collection and produces deterministic, evidence-backed product opportunity scores from real listing, detail, and identity-minimized public review data.
 
 See [ADR 0002](docs/adr/0002-browser-data-access.md) and [HANDOFF.md](HANDOFF.md) for evidence and next steps.
 
@@ -31,6 +31,7 @@ Check the current policy and run a limited live crawl:
 .venv/bin/python -m app.cli policy-check --source hepsiburada
 .venv/bin/python -m app.cli crawl --source hepsiburada --limit-products 20
 .venv/bin/python -m app.cli crawl --source hepsiburada --limit-products 5 --limit-details 2
+.venv/bin/python -m app.cli analyze --limit-products 60
 ```
 
 The browser runs visibly, uses one tab, and stops on an access block or CAPTCHA. Each requested detail includes only its first public rendered review page. Reviewer identity is discarded before persistence, and direct contact identifiers in review text are redacted.
@@ -42,6 +43,8 @@ Start the local application:
 ```
 
 Open `http://127.0.0.1:8000`. The health endpoint is available at `http://127.0.0.1:8000/healthz`.
+
+The live APIs are available at `http://127.0.0.1:8000/api/v1/products` and `http://127.0.0.1:8000/api/v1/opportunities`. Opportunity results include metric evidence, coverage, confidence, risks, and an explicitly validation-required hypothesis.
 
 ## Checks
 

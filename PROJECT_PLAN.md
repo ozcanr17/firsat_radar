@@ -26,13 +26,13 @@ Collect only permitted fields, with explicit coverage and reason codes for unava
 
 ## Stage 4: Analysis engine
 
-Status: Ready.
+Status: Complete.
 
 Implement deltas, percentiles, rule-based Turkish review labels, opportunity scores, evidence, and confidence.
 
 ## Stage 5: Web interface
 
-Status: Pending.
+Status: Ready.
 
 Build the dashboard, products, product detail, opportunities, run history, settings, JSON API, and CSV export.
 

@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.api.health import create_health_router
+from app.api.opportunities import create_opportunities_router
 from app.api.products import create_products_router
 from app.config import Settings, get_settings
 from app.db.session import build_engine, build_session_factory
@@ -31,6 +32,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.state.session_factory = session_factory
     application.include_router(create_health_router(session_factory))
     application.include_router(create_products_router(session_factory))
+    application.include_router(create_opportunities_router(session_factory))
     application.include_router(create_web_router(active_settings, session_factory))
     application.mount("/static", StaticFiles(directory=STATIC_PATH), name="static")
     return application

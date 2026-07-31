@@ -29,3 +29,11 @@ async def test_products_api_has_empty_live_state(client: AsyncClient) -> None:
 
     assert response.status_code == 200
     assert response.json() == {"items": [], "count": 0}
+
+
+@pytest.mark.asyncio
+async def test_opportunities_api_has_empty_live_state(client: AsyncClient) -> None:
+    response = await client.get("/api/v1/opportunities")
+
+    assert response.status_code == 200
+    assert response.json() == {"items": [], "count": 0}

@@ -105,6 +105,14 @@ h2 {
     overflow-x: auto;
 }
 
+.analysis-heading {
+    margin-top: 36px;
+}
+
+.analysis-heading h2 {
+    margin-bottom: 0;
+}
+
 table {
     width: 100%;
     border-collapse: collapse;

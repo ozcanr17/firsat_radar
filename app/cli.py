@@ -10,6 +10,7 @@ from app.config import Settings
 from app.db.migrations import upgrade_database
 from app.db.session import build_engine, build_session_factory
 from app.domain.crawl import CrawlLimits
+from app.services.analysis import AnalysisService
 from app.services.crawl import CrawlService
 from app.sources.hepsiburada.browser import HepsiburadaBrowserAdapter
 
@@ -104,6 +105,21 @@ def crawl(
         output = asdict(summary)
         output["status"] = summary.status.value
         typer.echo(json.dumps(output, ensure_ascii=False))
+    finally:
+        engine.dispose()
+
+
+@app.command()
+def analyze(
+    limit_products: int = typer.Option(60, min=1, max=60),
+) -> None:
+    settings = Settings()
+    upgrade_database(settings)
+    engine = build_engine(settings)
+    session_factory = build_session_factory(engine)
+    try:
+        summary = AnalysisService(session_factory).analyze(limit_products)
+        typer.echo(json.dumps(asdict(summary), ensure_ascii=False))
     finally:
         engine.dispose()
 

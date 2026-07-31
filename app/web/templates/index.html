@@ -25,6 +25,40 @@
             <h2 id="data-status">{{ data_state }}</h2>
             {% if products %}
             <p>{{ products|length }} canlı ürün son snapshot değerleriyle gösteriliyor.</p>
+            {% if opportunities %}
+            <div class="analysis-heading">
+                <p class="label">Fırsat sıralaması</p>
+                <h2>Kanıta dayalı analiz</h2>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Ürün</th>
+                            <th>Desen</th>
+                            <th>Puan</th>
+                            <th>Kapsam</th>
+                            <th>Güven</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for opportunity in opportunities %}
+                        <tr>
+                            <td><a href="{{ opportunity.source_url }}" rel="noreferrer">{{ opportunity.title }}</a></td>
+                            <td>{{ pattern_labels.get(opportunity.pattern, opportunity.pattern or "—") }}</td>
+                            <td><strong>{{ "%.1f"|format(opportunity.score) }}</strong></td>
+                            <td>{{ "%.0f"|format(opportunity.coverage * 100) }}%</td>
+                            <td>{{ "%.0f"|format(opportunity.confidence * 100) }}%</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+            <div class="analysis-heading">
+                <p class="label">Canlı ürünler</p>
+                <h2>Son gözlemler</h2>
+            </div>
             <div class="table-wrap">
                 <table>
                     <thead>
